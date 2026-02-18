@@ -175,3 +175,7 @@ export async function handleAuth(request) {
     return json({ error: 'Ошибка сервера', details: error.message }, 500);
   }
 }
+
+export default async function handler(request) {
+  return handleAuth(request);
+}
