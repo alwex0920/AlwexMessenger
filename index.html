@@ -1442,8 +1442,7 @@
         
         // Расшифровываем сообщение, если оно зашифровано
         let messageText = m.content;
-        if (m.encryptedContent && m.encryptedContent.length > 0 && m.encryptedKey && m.nonce && privateKey) {
-            // пытаемся расшифровать
+        if (m.encryptedContent && m.encryptedContent !== '' && m.encryptedKey && m.nonce && privateKey) {
             try {
                 messageText = await CryptoHelper.decryptMessage({
                     encryptedContent: m.encryptedContent,
@@ -1451,14 +1450,12 @@
                     nonce: m.nonce
                 }, privateKey);
             } catch (e) {
-                console.error('Decryption error:', e);
+                console.error('Decryption error for message', m.id, e);
                 messageText = '🔒 [Ошибка расшифровки]';
             }
-        } else if (m.content) {
-            // если есть обычный текст – показываем его
+        } else if (m.content && m.content !== '') {
             messageText = m.content;
         } else {
-            // если ничего нет – пустая строка или заглушка
             messageText = '';
         }
         
