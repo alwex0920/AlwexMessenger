@@ -128,7 +128,3 @@ export async function handleUsers(request) {
     return json({ error: 'Ошибка сервера', details: error.message }, 500);
   }
 }
-
-export default async function handler(request) {
-  return handleUsers(request);
-}
