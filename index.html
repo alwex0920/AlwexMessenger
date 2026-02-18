@@ -1442,23 +1442,24 @@
         
         // Расшифровываем сообщение, если оно зашифровано
         let messageText = m.content;
-        if (m.encryptedContent) {
-            if (privateKey) {
-                try {
-                    messageText = await CryptoHelper.decryptMessage({
-                        encryptedContent: m.encryptedContent,
-                        encryptedKey: m.encryptedKey,
-                        nonce: m.nonce
-                    }, privateKey);
-                } catch (e) {
-                    console.error('Decryption error:', e);
-                    messageText = '🔒 [Ошибка расшифровки]';
-                }
-            } else {
-                messageText = '🔒 [Требуется вход]';
+        if (m.encryptedContent && m.encryptedContent.length > 0 && m.encryptedKey && m.nonce && privateKey) {
+            // пытаемся расшифровать
+            try {
+                messageText = await CryptoHelper.decryptMessage({
+                    encryptedContent: m.encryptedContent,
+                    encryptedKey: m.encryptedKey,
+                    nonce: m.nonce
+                }, privateKey);
+            } catch (e) {
+                console.error('Decryption error:', e);
+                messageText = '🔒 [Ошибка расшифровки]';
             }
+        } else if (m.content) {
+            // если есть обычный текст – показываем его
+            messageText = m.content;
         } else {
-            messageText = m.content || '';
+            // если ничего нет – пустая строка или заглушка
+            messageText = '';
         }
         
         if (m.type === 'image' && m.mediaData) {
