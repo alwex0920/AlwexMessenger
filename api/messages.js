@@ -363,7 +363,3 @@ export async function handleMessages(request) {
     return json({ error: 'Ошибка сервера', details: error.message }, 500);
   }
 }
-
-export default async function handler(request) {
-  return handleMessages(request);
-}
