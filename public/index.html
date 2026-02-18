@@ -1,714 +1,942 @@
 <!DOCTYPE html>
-    <html lang="ru">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-        <title>AlwexMessenger</title>
-        <meta name="theme-color" content="#6366f1">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <style>
-            :root{--bg:#0a0a0a;--bg2:#141414;--bg3:#1e1e1e;--bg4:#252525;--accent:#6366f1;--accent2:#8b5cf6;--text:#fff;--text2:#888;--text3:#555;--success:#22c55e;--danger:#ef4444;--warning:#f59e0b;--border:#2a2a2a}
-            *{margin:0;padding:0;box-sizing:border-box}
-            body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
-            
-            /* Ripple */
-            .ripple{position:relative;overflow:hidden}
-            .ripple::after{content:'';position:absolute;width:100%;height:100%;top:0;left:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,0.3) 10%,transparent 10%);background-repeat:no-repeat;background-position:50%;transform:scale(10);opacity:0;transition:transform .5s,opacity .5s}
-            .ripple:active::after{transform:scale(0);opacity:.3;transition:0s}
-            
-            /* Auth */
-            .auth{display:flex;align-items:center;justify-content:center;height:100%;padding:20px;overflow-y:auto}
-            .auth.hidden{display:none}
-            .auth-box{width:100%;max-width:400px;animation:fadeIn .5s}
-            @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-            .logo{text-align:center;margin-bottom:32px}
-            .logo-icon{width:80px;height:80px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;box-shadow:0 20px 40px rgba(99,102,241,.3);animation:pulse 2s infinite}
-            @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-            .logo-icon svg{width:40px;height:40px;fill:#fff}
-            .logo h1{font-size:28px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-            .logo p{color:var(--text2);margin-top:8px;font-size:14px}
-            .tabs{display:flex;background:var(--bg2);border-radius:12px;padding:4px;margin-bottom:24px}
-            .tab{flex:1;padding:12px;border:none;background:none;color:var(--text2);font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .2s}
-            .tab.active{background:var(--accent);color:#fff}
-            .form{display:none}
-            .form.active{display:block;animation:slideIn .3s}
-            @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
-            .field{margin-bottom:16px}
-            .field label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
-            .field input,.field select,.field textarea{width:100%;padding:14px;background:var(--bg2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;transition:all .2s;font-family:inherit}
-            .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
-            .field textarea{resize:vertical;min-height:80px}
-            .hint{font-size:12px;color:var(--text2);margin-top:4px}
-            .gender-select{display:flex;gap:8px;margin-top:8px}
-            .gender-option{flex:1;padding:12px 8px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2);font-size:13px}
-            .gender-option:hover{border-color:var(--accent);background:var(--bg3)}
-            .gender-option.selected{border-color:var(--accent);background:rgba(99,102,241,.15)}
-            .gender-option svg{width:24px;height:24px;margin-bottom:4px;fill:currentColor}
-            .btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
-            .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
-            .btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(99,102,241,.4)}
-            .btn-primary:active{transform:translateY(0)}
-            .btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
-            .btn-secondary:hover{background:var(--bg4)}
-            .btn-danger{background:var(--danger);color:#fff}
-            .btn-danger:hover{opacity:.9}
-            .btn-text{background:none;color:var(--accent)}
-            .btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
-            .btn-sm{padding:10px 16px;font-size:13px;width:auto}
-            .error{background:rgba(239,68,68,.1);border:1px solid var(--danger);border-radius:10px;padding:12px;color:var(--danger);font-size:13px;margin-bottom:16px;display:none;animation:shake .4s}
-            @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
-            .error.show{display:block}
-            .success{background:rgba(34,197,94,.1);border:1px solid var(--success);border-radius:10px;padding:12px;color:var(--success);font-size:13px;margin-bottom:16px;display:none}
-            .success.show{display:block}
-            .verify-inputs{display:flex;gap:8px;justify-content:center;margin:20px 0}
-            .verify-inputs input{width:45px;height:55px;text-align:center;font-size:24px;font-weight:700;background:var(--bg2);border:2px solid var(--border);border-radius:10px;color:var(--text);transition:all .2s}
-            .verify-inputs input:focus{outline:none;border-color:var(--accent);transform:scale(1.1)}
-            
-            /* App */
-            .app{display:none;height:100%}
-            .app.active{display:flex}
-            
-            /* Sidebar */
-            .sidebar{width:320px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:transform .3s}
-            .sidebar-head{padding:16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
-            .sidebar-head h1{font-size:22px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-            .icon-btn{width:40px;height:40px;border:none;border-radius:50%;background:var(--bg3);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
-            .icon-btn:hover{background:var(--border);transform:scale(1.1)}
-            .icon-btn:active{transform:scale(.95)}
-            .icon-btn svg{width:20px;height:20px;fill:currentColor}
-            .icon-btn.small{width:32px;height:32px}
-            .icon-btn.small svg{width:16px;height:16px}
-            .search{padding:12px 16px}
-            .search input{width:100%;padding:10px 14px;background:var(--bg3);border:none;border-radius:10px;color:var(--text);font-size:14px;transition:all .2s}
-            .search input:focus{outline:none;box-shadow:0 0 0 2px rgba(99,102,241,.3)}
-            .chat-tabs{display:flex;padding:0 16px;gap:8px;margin-bottom:8px}
-            .chat-tab{flex:1;padding:8px;border:none;background:var(--bg3);color:var(--text2);font-size:12px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .2s}
-            .chat-tab.active{background:var(--accent);color:#fff}
-            .chats{flex:1;overflow-y:auto}
-            .chat-item{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;transition:all .2s}
-            .chat-item:hover{background:var(--bg3)}
-            .chat-item.active{background:rgba(99,102,241,.15)}
-            .chat-item img{width:48px;height:48px;border-radius:50%;object-fit:cover}
-            .chat-item-info{flex:1;min-width:0}
-            .chat-item-name{font-weight:600;font-size:15px;display:flex;align-items:center;gap:6px}
-            .chat-item-name .badge{font-size:10px;padding:2px 6px;background:var(--accent);color:#fff;border-radius:4px;font-weight:500}
-            .chat-item-msg{font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-            .chat-item-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-            .chat-item-time{font-size:11px;color:var(--text2)}
-            .unread{background:var(--accent);color:#fff;font-size:11px;font-weight:700;min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:flex;align-items:center;justify-content:center}
-            .online-dot{width:10px;height:10px;background:var(--success);border-radius:50%;border:2px solid var(--bg2);position:absolute;bottom:0;right:0}
-            .avatar-wrap{position:relative;flex-shrink:0}
-            .sidebar-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px}
-            .sidebar-foot img{width:36px;height:36px;border-radius:50%;cursor:pointer;transition:transform .2s}
-            .sidebar-foot img:hover{transform:scale(1.1)}
-            .sidebar-foot-info{flex:1;cursor:pointer}
-            .sidebar-foot-name{font-weight:600;font-size:14px}
-            .sidebar-foot-status{font-size:12px;color:var(--success)}
-            
-            /* Chat */
-            .chat-area{flex:1;display:flex;flex-direction:column;background:var(--bg)}
-            .chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text2)}
-            .chat-empty svg{width:100px;height:100px;fill:var(--bg3);margin-bottom:16px;animation:float 3s ease-in-out infinite}
-            @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-            .chat-head{padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
-            .chat-head-back{display:none}
-            .chat-head img{width:40px;height:40px;border-radius:50%;cursor:pointer}
-            .chat-head-info{flex:1;cursor:pointer}
-            .chat-head-name{font-weight:600}
-            .chat-head-status{font-size:12px;color:var(--text2)}
-            .chat-head-status.online{color:var(--success)}
-            .messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:4px}
-            .message{display:flex;max-width:75%;animation:msgIn .3s cubic-bezier(.34,1.56,.64,1)}
-            @keyframes msgIn{from{opacity:0;transform:translateY(20px) scale(.8)}to{opacity:1;transform:translateY(0) scale(1)}}
-            .message.own{align-self:flex-end}
-            .msg-bubble{padding:10px 14px;border-radius:16px;word-wrap:break-word}
-            .message:not(.own) .msg-bubble{background:var(--bg2);border-bottom-left-radius:4px}
-            .message.own .msg-bubble{background:linear-gradient(135deg,var(--accent),var(--accent2));border-bottom-right-radius:4px}
-            .msg-sender{font-size:11px;font-weight:600;color:var(--accent);margin-bottom:4px}
-            .msg-text{font-size:15px;line-height:1.4;white-space:pre-wrap}
-            .msg-image{max-width:280px;max-height:300px;border-radius:12px;cursor:pointer;transition:transform .2s}
-            .msg-image:hover{transform:scale(1.02)}
-            .msg-time{font-size:10px;opacity:.7;margin-top:4px;text-align:right}
-            .typing{display:none;padding:8px 16px}
-            .typing.show{display:flex}
-            .typing-bubble{display:flex;gap:4px;background:var(--bg2);padding:12px 16px;border-radius:16px;border-bottom-left-radius:4px}
-            .typing-dot{width:8px;height:8px;background:var(--text2);border-radius:50%;animation:typing 1.4s infinite}
-            .typing-dot:nth-child(2){animation-delay:.2s}
-            .typing-dot:nth-child(3){animation-delay:.4s}
-            @keyframes typing{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-6px);opacity:1}}
-            .input-area{padding:12px 16px;background:var(--bg2);border-top:1px solid var(--border);display:flex;gap:12px;align-items:flex-end}
-            .input-wrap{flex:1;background:var(--bg3);border-radius:20px;display:flex;align-items:flex-end;padding:4px}
-            .input-wrap:focus-within{box-shadow:0 0 0 2px rgba(99,102,241,.3)}
-            .input-actions{display:flex;gap:4px;padding:4px}
-            .input-wrap textarea{flex:1;background:none;border:none;color:var(--text);font-size:15px;padding:10px 12px;resize:none;max-height:120px;line-height:1.4;font-family:inherit}
-            .input-wrap textarea:focus{outline:none}
-            .send-btn{width:44px;height:44px;border:none;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
-            .send-btn:hover{transform:scale(1.1) rotate(15deg)}
-            .send-btn:active{transform:scale(.9)}
-            .send-btn svg{width:20px;height:20px;fill:#fff}
-            
-            /* Image Preview */
-            .image-preview{display:none;padding:8px 16px;background:var(--bg2);border-top:1px solid var(--border)}
-            .image-preview.show{display:block}
-            .preview-container{position:relative;display:inline-block}
-            .preview-container img{max-width:150px;max-height:100px;border-radius:8px}
-            .preview-remove{position:absolute;top:-8px;right:-8px;width:24px;height:24px;border:none;border-radius:50%;background:var(--danger);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px}
-            
-            /* Modal */
-            .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(5px);z-index:1000;align-items:center;justify-content:center;padding:20px}
-            .modal.show{display:flex}
-            .modal-box{background:var(--bg2);border-radius:16px;width:100%;max-width:500px;max-height:85vh;display:flex;flex-direction:column;animation:slideUp .3s}
-            @keyframes slideUp{from{opacity:0;transform:translateY(50px)}to{opacity:1;transform:translateY(0)}}
-            .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-            .modal-head h2{font-size:18px}
-            .modal-body{flex:1;overflow-y:auto;padding:16px}
-            .modal-footer{padding:16px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end}
-            
-            /* Avatar Upload */
-            .avatar-upload{display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px}
-            .avatar-upload-preview{width:120px;height:120px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;overflow:hidden;border:3px solid var(--accent);cursor:pointer;transition:all .2s}
-            .avatar-upload-preview:hover{transform:scale(1.05);box-shadow:0 0 20px rgba(99,102,241,.3)}
-            .avatar-upload-preview img{width:100%;height:100%;object-fit:cover}
-            .avatar-upload-preview svg{width:40px;height:40px;fill:var(--text2)}
-            .avatar-upload input[type="file"]{display:none}
-            
-            /* Profile Edit */
-            .profile-header{display:flex;flex-direction:column;align-items:center;padding:20px;border-bottom:1px solid var(--border);margin-bottom:16px}
-            .profile-avatar{width:100px;height:100px;border-radius:50%;object-fit:cover;margin-bottom:12px;cursor:pointer;border:3px solid var(--accent);transition:all .2s}
-            .profile-avatar:hover{transform:scale(1.05)}
-            .profile-name{font-size:20px;font-weight:700}
-            .profile-username{color:var(--text2);font-size:14px}
-            
-            /* User list */
-            .user-item{display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;cursor:pointer;transition:all .2s}
-            .user-item:hover{background:var(--bg3)}
-            .user-item.selected{background:rgba(99,102,241,.15);border:1px solid var(--accent)}
-            .user-item img{width:44px;height:44px;border-radius:50%}
-            .user-item-info{flex:1}
-            .user-item-name{font-weight:600}
-            .user-item-status{font-size:12px;color:var(--text2)}
-            .user-item-check{width:24px;height:24px;border:2px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s}
-            .user-item.selected .user-item-check{background:var(--accent);border-color:var(--accent)}
-            .user-item.selected .user-item-check::after{content:'✓';color:#fff;font-size:14px}
-            
-            /* Settings */
-            .settings-section{margin-bottom:24px}
-            .settings-section h3{font-size:12px;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;padding:0 4px}
-            .settings-item{display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg3);border-radius:10px;margin-bottom:8px;transition:all .2s;cursor:pointer}
-            .settings-item:hover{background:var(--bg4)}
-            .settings-label{display:flex;align-items:center;gap:12px;flex:1}
-            .settings-label svg{width:20px;height:20px;fill:var(--text2)}
-            .settings-value{color:var(--text2);font-size:13px}
-            .toggle{width:48px;height:26px;background:var(--border);border-radius:13px;position:relative;cursor:pointer;transition:all .2s;flex-shrink:0}
-            .toggle.on{background:var(--accent)}
-            .toggle::after{content:'';width:20px;height:20px;background:#fff;border-radius:50%;position:absolute;top:3px;left:3px;transition:all .2s}
-            .toggle.on::after{left:25px}
-            
-            /* Group */
-            .group-members{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
-            .group-member-tag{display:flex;align-items:center;gap:6px;background:var(--bg3);padding:6px 10px;border-radius:20px;font-size:13px}
-            .group-member-tag img{width:20px;height:20px;border-radius:50%}
-            .group-member-tag button{background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;line-height:1}
-            .group-member-tag button:hover{color:var(--danger)}
-            
-            /* Image Viewer */
-            .image-viewer{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:2000;display:none;align-items:center;justify-content:center}
-            .image-viewer.show{display:flex}
-            .image-viewer img{max-width:90%;max-height:90%;object-fit:contain}
-            .image-viewer-close{position:absolute;top:20px;right:20px;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:24px}
-            
-            /* Mobile */
-            @media(max-width:768px){
-                .sidebar{position:fixed;inset:0;width:100%;z-index:10;transform:translateX(0)}
-                .sidebar.hide{transform:translateX(-100%)}
-                .chat-head-back{display:flex}
-                .message{max-width:85%}
-                .modal-box{max-width:100%;max-height:100%;border-radius:0}
-            }
-            
-            /* Toast */
-            .toast-box{position:fixed;top:20px;right:20px;z-index:3000;display:flex;flex-direction:column;gap:10px}
-            .toast{padding:14px 20px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;animation:toastIn .3s;box-shadow:0 10px 30px rgba(0,0,0,.3);min-width:280px;max-width:400px}
-            @keyframes toastIn{from{opacity:0;transform:translateX(100px)}to{opacity:1;transform:translateX(0)}}
-            .toast.hiding{animation:toastOut .3s forwards}
-            @keyframes toastOut{to{opacity:0;transform:translateX(100px)}}
-            .toast svg{width:24px;height:24px;flex-shrink:0}
-            .toast.error{border-color:var(--danger)}
-            .toast.error svg{fill:var(--danger)}
-            .toast.success{border-color:var(--success)}
-            .toast.success svg{fill:var(--success)}
-            .toast-msg{flex:1}
-            .toast-title{font-weight:600;font-size:14px}
-            .toast-text{font-size:13px;color:var(--text2)}
-            
-            /* Spinner */
-            .spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
-            @keyframes spin{to{transform:rotate(360deg)}}
-            
-            /* Scrollbar */
-            ::-webkit-scrollbar{width:6px;height:6px}
-            ::-webkit-scrollbar-track{background:transparent}
-            ::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
-            ::-webkit-scrollbar-thumb:hover{background:var(--border)}
-            
-            /* Danger Zone */
-            .danger-zone{border:1px solid var(--danger);border-radius:10px;padding:16px;margin-top:24px}
-            .danger-zone h4{color:var(--danger);margin-bottom:8px;font-size:14px}
-            .danger-zone p{color:var(--text2);font-size:13px;margin-bottom:12px}
-            
-            /* Delete button */
-            .msg-bubble {
-                position: relative;
-            }
-            .delete-msg-btn {
-                position: absolute;
-                top: -8px;
-                right: -8px;
-                width: 24px;
-                height: 24px;
-                border: none;
-                border-radius: 50%;
-                background: var(--danger);
-                color: white;
-                cursor: pointer;
-                display: none;
-                align-items: center;
-                justify-content: center;
-                font-size: 14px;
-                padding: 0;
-                opacity: 0;
-                transition: opacity 0.2s;
-            }
-            .message:hover .delete-msg-btn {
-                display: flex;
-                opacity: 1;
-            }
-            .delete-msg-btn:hover {
-                transform: scale(1.1);
-            }
-        </style>
-    </head>
-    <body>
-        <div class="toast-box" id="toasts"></div>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <title>AlwexMessenger - E2E Encrypted</title>
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <style>
+        /* Все твои оригинальные стили */
+        :root{--bg:#0a0a0a;--bg2:#141414;--bg3:#1e1e1e;--bg4:#252525;--accent:#6366f1;--accent2:#8b5cf6;--text:#fff;--text2:#888;--text3:#555;--success:#22c55e;--danger:#ef4444;--warning:#f59e0b;--border:#2a2a2a}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
         
-        <!-- Image Viewer -->
-        <div class="image-viewer" id="imageViewer" onclick="closeImageViewer()">
-            <button class="image-viewer-close">&times;</button>
-            <img id="viewerImage" src="">
-        </div>
+        /* Ripple */
+        .ripple{position:relative;overflow:hidden}
+        .ripple::after{content:'';position:absolute;width:100%;height:100%;top:0;left:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,0.3) 10%,transparent 10%);background-repeat:no-repeat;background-position:50%;transform:scale(10);opacity:0;transition:transform .5s,opacity .5s}
+        .ripple:active::after{transform:scale(0);opacity:.3;transition:0s}
+        
+        /* Auth */
+        .auth{display:flex;align-items:center;justify-content:center;height:100%;padding:20px;overflow-y:auto}
+        .auth.hidden{display:none}
+        .auth-box{width:100%;max-width:400px;animation:fadeIn .5s}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        .logo{text-align:center;margin-bottom:32px}
+        .logo-icon{width:80px;height:80px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:20px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;box-shadow:0 20px 40px rgba(99,102,241,.3);animation:pulse 2s infinite}
+        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+        .logo-icon svg{width:40px;height:40px;fill:#fff}
+        .logo h1{font-size:28px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .logo p{color:var(--text2);margin-top:8px;font-size:14px}
+        .tabs{display:flex;background:var(--bg2);border-radius:12px;padding:4px;margin-bottom:24px}
+        .tab{flex:1;padding:12px;border:none;background:none;color:var(--text2);font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .2s}
+        .tab.active{background:var(--accent);color:#fff}
+        .form{display:none}
+        .form.active{display:block;animation:slideIn .3s}
+        @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+        .field{margin-bottom:16px}
+        .field label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
+        .field input,.field select,.field textarea{width:100%;padding:14px;background:var(--bg2);border:2px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;transition:all .2s;font-family:inherit}
+        .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+        .field textarea{resize:vertical;min-height:80px}
+        .hint{font-size:12px;color:var(--text2);margin-top:4px}
+        .gender-select{display:flex;gap:8px;margin-top:8px}
+        .gender-option{flex:1;padding:12px 8px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2);font-size:13px}
+        .gender-option:hover{border-color:var(--accent);background:var(--bg3)}
+        .gender-option.selected{border-color:var(--accent);background:rgba(99,102,241,.15)}
+        .gender-option svg{width:24px;height:24px;margin-bottom:4px;fill:currentColor}
+        .btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+        .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(99,102,241,.4)}
+        .btn-primary:active{transform:translateY(0)}
+        .btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
+        .btn-secondary:hover{background:var(--bg4)}
+        .btn-danger{background:var(--danger);color:#fff}
+        .btn-danger:hover{opacity:.9}
+        .btn-text{background:none;color:var(--accent)}
+        .btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+        .btn-sm{padding:10px 16px;font-size:13px;width:auto}
+        .error{background:rgba(239,68,68,.1);border:1px solid var(--danger);border-radius:10px;padding:12px;color:var(--danger);font-size:13px;margin-bottom:16px;display:none;animation:shake .4s}
+        @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+        .error.show{display:block}
+        .success{background:rgba(34,197,94,.1);border:1px solid var(--success);border-radius:10px;padding:12px;color:var(--success);font-size:13px;margin-bottom:16px;display:none}
+        .success.show{display:block}
+        .verify-inputs{display:flex;gap:8px;justify-content:center;margin:20px 0}
+        .verify-inputs input{width:45px;height:55px;text-align:center;font-size:24px;font-weight:700;background:var(--bg2);border:2px solid var(--border);border-radius:10px;color:var(--text);transition:all .2s}
+        .verify-inputs input:focus{outline:none;border-color:var(--accent);transform:scale(1.1)}
+        
+        /* App */
+        .app{display:none;height:100%}
+        .app.active{display:flex}
+        
+        /* Sidebar */
+        .sidebar{width:320px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:transform .3s}
+        .sidebar-head{padding:16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+        .sidebar-head h1{font-size:22px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .icon-btn{width:40px;height:40px;border:none;border-radius:50%;background:var(--bg3);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+        .icon-btn:hover{background:var(--border);transform:scale(1.1)}
+        .icon-btn:active{transform:scale(.95)}
+        .icon-btn svg{width:20px;height:20px;fill:currentColor}
+        .icon-btn.small{width:32px;height:32px}
+        .icon-btn.small svg{width:16px;height:16px}
+        .search{padding:12px 16px}
+        .search input{width:100%;padding:10px 14px;background:var(--bg3);border:none;border-radius:10px;color:var(--text);font-size:14px;transition:all .2s}
+        .search input:focus{outline:none;box-shadow:0 0 0 2px rgba(99,102,241,.3)}
+        .chat-tabs{display:flex;padding:0 16px;gap:8px;margin-bottom:8px}
+        .chat-tab{flex:1;padding:8px;border:none;background:var(--bg3);color:var(--text2);font-size:12px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .2s}
+        .chat-tab.active{background:var(--accent);color:#fff}
+        .chats{flex:1;overflow-y:auto}
+        .chat-item{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;transition:all .2s}
+        .chat-item:hover{background:var(--bg3)}
+        .chat-item.active{background:rgba(99,102,241,.15)}
+        .chat-item img{width:48px;height:48px;border-radius:50%;object-fit:cover}
+        .chat-item-info{flex:1;min-width:0}
+        .chat-item-name{font-weight:600;font-size:15px;display:flex;align-items:center;gap:6px}
+        .chat-item-name .badge{font-size:10px;padding:2px 6px;background:var(--accent);color:#fff;border-radius:4px;font-weight:500}
+        .chat-item-msg{font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .chat-item-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+        .chat-item-time{font-size:11px;color:var(--text2)}
+        .unread{background:var(--accent);color:#fff;font-size:11px;font-weight:700;min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+        .online-dot{width:10px;height:10px;background:var(--success);border-radius:50%;border:2px solid var(--bg2);position:absolute;bottom:0;right:0}
+        .avatar-wrap{position:relative;flex-shrink:0}
+        .sidebar-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px}
+        .sidebar-foot img{width:36px;height:36px;border-radius:50%;cursor:pointer;transition:transform .2s}
+        .sidebar-foot img:hover{transform:scale(1.1)}
+        .sidebar-foot-info{flex:1;cursor:pointer}
+        .sidebar-foot-name{font-weight:600;font-size:14px}
+        .sidebar-foot-status{font-size:12px;color:var(--success)}
+        
+        /* Chat */
+        .chat-area{flex:1;display:flex;flex-direction:column;background:var(--bg)}
+        .chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text2)}
+        .chat-empty svg{width:100px;height:100px;fill:var(--bg3);margin-bottom:16px;animation:float 3s ease-in-out infinite}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        .chat-head{padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+        .chat-head-back{display:none}
+        .chat-head img{width:40px;height:40px;border-radius:50%;cursor:pointer}
+        .chat-head-info{flex:1;cursor:pointer}
+        .chat-head-name{font-weight:600}
+        .chat-head-status{font-size:12px;color:var(--text2)}
+        .chat-head-status.online{color:var(--success)}
+        .messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:4px}
+        .message{display:flex;max-width:75%;animation:msgIn .3s cubic-bezier(.34,1.56,.64,1)}
+        @keyframes msgIn{from{opacity:0;transform:translateY(20px) scale(.8)}to{opacity:1;transform:translateY(0) scale(1)}}
+        .message.own{align-self:flex-end}
+        .msg-bubble{padding:10px 14px;border-radius:16px;word-wrap:break-word}
+        .message:not(.own) .msg-bubble{background:var(--bg2);border-bottom-left-radius:4px}
+        .message.own .msg-bubble{background:linear-gradient(135deg,var(--accent),var(--accent2));border-bottom-right-radius:4px}
+        .msg-sender{font-size:11px;font-weight:600;color:var(--accent);margin-bottom:4px}
+        .msg-text{font-size:15px;line-height:1.4;white-space:pre-wrap}
+        .msg-image{max-width:280px;max-height:300px;border-radius:12px;cursor:pointer;transition:transform .2s}
+        .msg-image:hover{transform:scale(1.02)}
+        .msg-time{font-size:10px;opacity:.7;margin-top:4px;text-align:right}
+        .typing{display:none;padding:8px 16px}
+        .typing.show{display:flex}
+        .typing-bubble{display:flex;gap:4px;background:var(--bg2);padding:12px 16px;border-radius:16px;border-bottom-left-radius:4px}
+        .typing-dot{width:8px;height:8px;background:var(--text2);border-radius:50%;animation:typing 1.4s infinite}
+        .typing-dot:nth-child(2){animation-delay:.2s}
+        .typing-dot:nth-child(3){animation-delay:.4s}
+        @keyframes typing{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-6px);opacity:1}}
+        .input-area{padding:12px 16px;background:var(--bg2);border-top:1px solid var(--border);display:flex;gap:12px;align-items:flex-end}
+        .input-wrap{flex:1;background:var(--bg3);border-radius:20px;display:flex;align-items:flex-end;padding:4px}
+        .input-wrap:focus-within{box-shadow:0 0 0 2px rgba(99,102,241,.3)}
+        .input-actions{display:flex;gap:4px;padding:4px}
+        .input-wrap textarea{flex:1;background:none;border:none;color:var(--text);font-size:15px;padding:10px 12px;resize:none;max-height:120px;line-height:1.4;font-family:inherit}
+        .input-wrap textarea:focus{outline:none}
+        .send-btn{width:44px;height:44px;border:none;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+        .send-btn:hover{transform:scale(1.1) rotate(15deg)}
+        .send-btn:active{transform:scale(.9)}
+        .send-btn svg{width:20px;height:20px;fill:#fff}
+        
+        /* Image Preview */
+        .image-preview{display:none;padding:8px 16px;background:var(--bg2);border-top:1px solid var(--border)}
+        .image-preview.show{display:block}
+        .preview-container{position:relative;display:inline-block}
+        .preview-container img{max-width:150px;max-height:100px;border-radius:8px}
+        .preview-remove{position:absolute;top:-8px;right:-8px;width:24px;height:24px;border:none;border-radius:50%;background:var(--danger);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px}
+        
+        /* Modal */
+        .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(5px);z-index:1000;align-items:center;justify-content:center;padding:20px}
+        .modal.show{display:flex}
+        .modal-box{background:var(--bg2);border-radius:16px;width:100%;max-width:500px;max-height:85vh;display:flex;flex-direction:column;animation:slideUp .3s}
+        @keyframes slideUp{from{opacity:0;transform:translateY(50px)}to{opacity:1;transform:translateY(0)}}
+        .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+        .modal-head h2{font-size:18px}
+        .modal-body{flex:1;overflow-y:auto;padding:16px}
+        .modal-footer{padding:16px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end}
+        
+        /* Avatar Upload */
+        .avatar-upload{display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px}
+        .avatar-upload-preview{width:120px;height:120px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;overflow:hidden;border:3px solid var(--accent);cursor:pointer;transition:all .2s}
+        .avatar-upload-preview:hover{transform:scale(1.05);box-shadow:0 0 20px rgba(99,102,241,.3)}
+        .avatar-upload-preview img{width:100%;height:100%;object-fit:cover}
+        .avatar-upload-preview svg{width:40px;height:40px;fill:var(--text2)}
+        .avatar-upload input[type="file"]{display:none}
+        
+        /* Profile Edit */
+        .profile-header{display:flex;flex-direction:column;align-items:center;padding:20px;border-bottom:1px solid var(--border);margin-bottom:16px}
+        .profile-avatar{width:100px;height:100px;border-radius:50%;object-fit:cover;margin-bottom:12px;cursor:pointer;border:3px solid var(--accent);transition:all .2s}
+        .profile-avatar:hover{transform:scale(1.05)}
+        .profile-name{font-size:20px;font-weight:700}
+        .profile-username{color:var(--text2);font-size:14px}
+        
+        /* User list */
+        .user-item{display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;cursor:pointer;transition:all .2s}
+        .user-item:hover{background:var(--bg3)}
+        .user-item.selected{background:rgba(99,102,241,.15);border:1px solid var(--accent)}
+        .user-item img{width:44px;height:44px;border-radius:50%}
+        .user-item-info{flex:1}
+        .user-item-name{font-weight:600}
+        .user-item-status{font-size:12px;color:var(--text2)}
+        .user-item-check{width:24px;height:24px;border:2px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s}
+        .user-item.selected .user-item-check{background:var(--accent);border-color:var(--accent)}
+        .user-item.selected .user-item-check::after{content:'✓';color:#fff;font-size:14px}
+        
+        /* Settings */
+        .settings-section{margin-bottom:24px}
+        .settings-section h3{font-size:12px;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;padding:0 4px}
+        .settings-item{display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg3);border-radius:10px;margin-bottom:8px;transition:all .2s;cursor:pointer}
+        .settings-item:hover{background:var(--bg4)}
+        .settings-label{display:flex;align-items:center;gap:12px;flex:1}
+        .settings-label svg{width:20px;height:20px;fill:var(--text2)}
+        .settings-value{color:var(--text2);font-size:13px}
+        .toggle{width:48px;height:26px;background:var(--border);border-radius:13px;position:relative;cursor:pointer;transition:all .2s;flex-shrink:0}
+        .toggle.on{background:var(--accent)}
+        .toggle::after{content:'';width:20px;height:20px;background:#fff;border-radius:50%;position:absolute;top:3px;left:3px;transition:all .2s}
+        .toggle.on::after{left:25px}
+        
+        /* Group */
+        .group-members{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+        .group-member-tag{display:flex;align-items:center;gap:6px;background:var(--bg3);padding:6px 10px;border-radius:20px;font-size:13px}
+        .group-member-tag img{width:20px;height:20px;border-radius:50%}
+        .group-member-tag button{background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;line-height:1}
+        .group-member-tag button:hover{color:var(--danger)}
+        
+        /* Image Viewer */
+        .image-viewer{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:2000;display:none;align-items:center;justify-content:center}
+        .image-viewer.show{display:flex}
+        .image-viewer img{max-width:90%;max-height:90%;object-fit:contain}
+        .image-viewer-close{position:absolute;top:20px;right:20px;width:44px;height:44px;border:none;border-radius:50%;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:24px}
+        
+        /* Mobile */
+        @media(max-width:768px){
+            .sidebar{position:fixed;inset:0;width:100%;z-index:10;transform:translateX(0)}
+            .sidebar.hide{transform:translateX(-100%)}
+            .chat-head-back{display:flex}
+            .message{max-width:85%}
+            .modal-box{max-width:100%;max-height:100%;border-radius:0}
+        }
+        
+        /* Toast */
+        .toast-box{position:fixed;top:20px;right:20px;z-index:3000;display:flex;flex-direction:column;gap:10px}
+        .toast{padding:14px 20px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;animation:toastIn .3s;box-shadow:0 10px 30px rgba(0,0,0,.3);min-width:280px;max-width:400px}
+        @keyframes toastIn{from{opacity:0;transform:translateX(100px)}to{opacity:1;transform:translateX(0)}}
+        .toast.hiding{animation:toastOut .3s forwards}
+        @keyframes toastOut{to{opacity:0;transform:translateX(100px)}}
+        .toast svg{width:24px;height:24px;flex-shrink:0}
+        .toast.error{border-color:var(--danger)}
+        .toast.error svg{fill:var(--danger)}
+        .toast.success{border-color:var(--success)}
+        .toast.success svg{fill:var(--success)}
+        .toast-msg{flex:1}
+        .toast-title{font-weight:600;font-size:14px}
+        .toast-text{font-size:13px;color:var(--text2)}
+        
+        /* Spinner */
+        .spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar{width:6px;height:6px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px}
+        ::-webkit-scrollbar-thumb:hover{background:var(--border)}
+        
+        /* Danger Zone */
+        .danger-zone{border:1px solid var(--danger);border-radius:10px;padding:16px;margin-top:24px}
+        .danger-zone h4{color:var(--danger);margin-bottom:8px;font-size:14px}
+        .danger-zone p{color:var(--text2);font-size:13px;margin-bottom:12px}
+        
+        /* Delete button */
+        .msg-bubble {
+            position: relative;
+        }
+        .delete-msg-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 50%;
+            background: var(--danger);
+            color: white;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            padding: 0;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .message:hover .delete-msg-btn {
+            display: flex;
+            opacity: 1;
+        }
+        .delete-msg-btn:hover {
+            transform: scale(1.1);
+        }
 
-        <!-- Auth -->
-        <div class="auth" id="authScreen">
-            <div class="auth-box">
-                <div class="logo">
-                    <div class="logo-icon">
-                        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
-                    </div>
-                    <h1>AlwexMessenger</h1>
-                    <p>Безопасное общение без границ</p>
-                </div>
+        /* Encrypted badge */
+        .encrypted-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: var(--success);
+            margin-left: 8px;
+        }
+        .encrypted-badge svg {
+            width: 12px;
+            height: 12px;
+            fill: var(--success);
+        }
+    </style>
+</head>
+<body>
+    <div class="toast-box" id="toasts"></div>
+    
+    <!-- Image Viewer -->
+    <div class="image-viewer" id="imageViewer" onclick="closeImageViewer()">
+        <button class="image-viewer-close">&times;</button>
+        <img id="viewerImage" src="">
+    </div>
 
-                <div class="tabs">
-                    <button class="tab active ripple" data-tab="login">Вход</button>
-                    <button class="tab ripple" data-tab="register">Регистрация</button>
-                </div>
-
-                <div class="error" id="authError"></div>
-                <div class="success" id="authSuccess"></div>
-
-                <form class="form active" id="loginForm" data-form="login">
-                    <div class="field">
-                        <label>Имя пользователя или Email</label>
-                        <input type="text" id="loginUser" required autocomplete="username">
-                    </div>
-                    <div class="field">
-                        <label>Пароль</label>
-                        <input type="password" id="loginPass" required autocomplete="current-password">
-                    </div>
-                    <div class="field" id="tfaField" style="display:none">
-                        <label>Код 2FA</label>
-                        <input type="text" id="tfaCode" maxlength="6" inputmode="numeric" placeholder="123456">
-                    </div>
-                    <button type="submit" class="btn btn-primary ripple" id="loginBtn"><span>Войти</span></button>
-                </form>
-
-                <form class="form" id="registerForm" data-form="register">
-                    <div class="field">
-                        <label>Имя пользователя</label>
-                        <input type="text" id="regUser" required minlength="3" maxlength="30">
-                        <div class="hint">3-30 символов: буквы, цифры, _</div>
-                    </div>
-                    <div class="field">
-                        <label>Email</label>
-                        <input type="email" id="regEmail" required>
-                    </div>
-                    <div class="field">
-                        <label>Пароль</label>
-                        <input type="password" id="regPass" required minlength="8">
-                        <div class="hint">Мин. 8 символов: A-Z, a-z, 0-9</div>
-                    </div>
-                    <div class="field">
-                        <label>Пол</label>
-                        <div class="gender-select">
-                            <div class="gender-option" data-gender="male">👨 Муж</div>
-                            <div class="gender-option" data-gender="female">👩 Жен</div>
-                            <div class="gender-option" data-gender="other">🧑 Другое</div>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary ripple" id="registerBtn"><span>Создать аккаунт</span></button>
-                </form>
-
-                <form class="form" id="verifyForm" data-form="verify">
-                    <p style="text-align:center;color:var(--text2);margin-bottom:8px">Код отправлен на email</p>
-                    <p style="text-align:center;color:var(--accent);font-size:14px;margin-bottom:20px" id="verifyEmail"></p>
-                    <div class="verify-inputs" id="verifyInputs">
-                        <input type="text" maxlength="1" inputmode="numeric" required>
-                        <input type="text" maxlength="1" inputmode="numeric" required>
-                        <input type="text" maxlength="1" inputmode="numeric" required>
-                        <input type="text" maxlength="1" inputmode="numeric" required>
-                        <input type="text" maxlength="1" inputmode="numeric" required>
-                        <input type="text" maxlength="1" inputmode="numeric" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary ripple">Подтвердить</button>
-                    <button type="button" class="btn btn-text" onclick="resendCode()">Отправить повторно</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- App -->
-        <div class="app" id="app">
-            <aside class="sidebar" id="sidebar">
-                <div class="sidebar-head">
-                    <h1>Alwex</h1>
-                    <div style="display:flex;gap:8px">
-                        <button class="icon-btn ripple" onclick="showModal('newChatModal')" title="Новый чат">
-                            <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                        </button>
-                        <button class="icon-btn ripple" onclick="showModal('createGroupModal')" title="Создать группу">
-                            <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-                        </button>
-                        <button class="icon-btn ripple" onclick="showModal('settingsModal'); loadSessions();" title="Настройки">
-                            <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="search"><input type="text" id="searchInput" placeholder="Поиск чатов..."></div>
-                <div class="chats" id="chatList"></div>
-                <div class="sidebar-foot">
-                    <img id="myAvatar" src="" onclick="showModal('profileModal')">
-                    <div class="sidebar-foot-info" onclick="showModal('profileModal')">
-                        <div class="sidebar-foot-name" id="myName"></div>
-                        <div class="sidebar-foot-status">В сети</div>
-                    </div>
-                    <button class="icon-btn ripple" onclick="logout()" title="Выйти">
-                        <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
-                    </button>
-                </div>
-            </aside>
-
-            <main class="chat-area" id="chatArea">
-                <div class="chat-empty" id="chatEmpty">
+    <!-- Auth -->
+    <div class="auth" id="authScreen">
+        <div class="auth-box">
+            <div class="logo">
+                <div class="logo-icon">
                     <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
-                    <h3>Выберите чат</h3>
-                    <p>Начните общение с друзьями</p>
                 </div>
-                <header class="chat-head" id="chatHead" style="display:none">
-                    <button class="icon-btn chat-head-back ripple" id="backBtn"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>
-                    <img id="chatAvatar" src="" onclick="showChatInfo()">
-                    <div class="chat-head-info" onclick="showChatInfo()">
-                        <div class="chat-head-name" id="chatName"></div>
-                        <div class="chat-head-status" id="chatStatus"></div>
-                    </div>
-                </header>
-                <div class="messages" id="messages" style="display:none"></div>
-                <div class="typing" id="typing"><div class="typing-bubble"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>
-                <div class="image-preview" id="imagePreview">
-                    <div class="preview-container">
-                        <img id="previewImage" src="">
-                        <button class="preview-remove" onclick="clearImagePreview()">&times;</button>
+                <h1>AlwexMessenger</h1>
+                <p>Безопасное общение без границ</p>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active ripple" data-tab="login">Вход</button>
+                <button class="tab ripple" data-tab="register">Регистрация</button>
+            </div>
+
+            <div class="error" id="authError"></div>
+            <div class="success" id="authSuccess"></div>
+
+            <form class="form active" id="loginForm" data-form="login">
+                <div class="field">
+                    <label>Имя пользователя или Email</label>
+                    <input type="text" id="loginUser" required autocomplete="username">
+                </div>
+                <div class="field">
+                    <label>Пароль</label>
+                    <input type="password" id="loginPass" required autocomplete="current-password">
+                </div>
+                <div class="field" id="tfaField" style="display:none">
+                    <label>Код 2FA</label>
+                    <input type="text" id="tfaCode" maxlength="6" inputmode="numeric" placeholder="123456">
+                </div>
+                <button type="submit" class="btn btn-primary ripple" id="loginBtn"><span>Войти</span></button>
+            </form>
+
+            <form class="form" id="registerForm" data-form="register">
+                <div class="field">
+                    <label>Имя пользователя</label>
+                    <input type="text" id="regUser" required minlength="3" maxlength="30">
+                    <div class="hint">3-30 символов: буквы, цифры, _</div>
+                </div>
+                <div class="field">
+                    <label>Email</label>
+                    <input type="email" id="regEmail" required>
+                </div>
+                <div class="field">
+                    <label>Пароль</label>
+                    <input type="password" id="regPass" required minlength="8">
+                    <div class="hint">Мин. 8 символов: A-Z, a-z, 0-9</div>
+                </div>
+                <div class="field">
+                    <label>Пол</label>
+                    <div class="gender-select">
+                        <div class="gender-option" data-gender="male">👨 Муж</div>
+                        <div class="gender-option" data-gender="female">👩 Жен</div>
+                        <div class="gender-option" data-gender="other">🧑 Другое</div>
                     </div>
                 </div>
-                <div class="input-area" id="inputArea" style="display:none">
-                    <div class="input-wrap">
-                        <div class="input-actions">
-                            <button class="icon-btn small ripple" onclick="document.getElementById('imageInput').click()" title="Отправить фото">
-                                <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-                            </button>
-                        </div>
-                        <textarea id="msgInput" placeholder="Сообщение..." rows="1"></textarea>
-                        <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="previewImage(this)">
-                    </div>
-                    <button class="send-btn ripple" id="sendBtn" onclick="sendMsg()">
-                        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                <button type="submit" class="btn btn-primary ripple" id="registerBtn"><span>Создать аккаунт</span></button>
+            </form>
+
+            <form class="form" id="verifyForm" data-form="verify">
+                <p style="text-align:center;color:var(--text2);margin-bottom:8px">Код отправлен на email</p>
+                <p style="text-align:center;color:var(--accent);font-size:14px;margin-bottom:20px" id="verifyEmail"></p>
+                <div class="verify-inputs" id="verifyInputs">
+                    <input type="text" maxlength="1" inputmode="numeric" required>
+                    <input type="text" maxlength="1" inputmode="numeric" required>
+                    <input type="text" maxlength="1" inputmode="numeric" required>
+                    <input type="text" maxlength="1" inputmode="numeric" required>
+                    <input type="text" maxlength="1" inputmode="numeric" required>
+                    <input type="text" maxlength="1" inputmode="numeric" required>
+                </div>
+                <button type="submit" class="btn btn-primary ripple">Подтвердить</button>
+                <button type="button" class="btn btn-text" onclick="resendCode()">Отправить повторно</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- App -->
+    <div class="app" id="app">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-head">
+                <h1>Alwex</h1>
+                <div style="display:flex;gap:8px">
+                    <button class="icon-btn ripple" onclick="showModal('newChatModal')" title="Новый чат">
+                        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                    </button>
+                    <button class="icon-btn ripple" onclick="showModal('createGroupModal')" title="Создать группу">
+                        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                    </button>
+                    <button class="icon-btn ripple" onclick="showModal('settingsModal'); loadSessions();" title="Настройки">
+                        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
                     </button>
                 </div>
-            </main>
-        </div>
-        <!-- Modals -->
-        
-        <!-- New Chat Modal -->
-        <div class="modal" id="newChatModal">
-            <div class="modal-box">
-                <div class="modal-head">
-                    <h2>Новый чат</h2>
-                    <button class="icon-btn ripple" onclick="closeModal('newChatModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="search"><input type="text" id="searchInput" placeholder="Поиск чатов..."></div>
+            <div class="chats" id="chatList"></div>
+            <div class="sidebar-foot">
+                <img id="myAvatar" src="" onclick="showModal('profileModal')">
+                <div class="sidebar-foot-info" onclick="showModal('profileModal')">
+                    <div class="sidebar-foot-name" id="myName"></div>
+                    <div class="sidebar-foot-status">В сети</div>
                 </div>
-                <div class="modal-body">
-                    <div class="search" style="padding:0 0 12px"><input type="text" id="userSearch" placeholder="Поиск пользователей..." oninput="searchUsers(this.value)"></div>
-                    <div id="userList"></div>
+                <button class="icon-btn ripple" onclick="logout()" title="Выйти">
+                    <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+                </button>
+            </div>
+        </aside>
+
+        <main class="chat-area" id="chatArea">
+            <div class="chat-empty" id="chatEmpty">
+                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                <h3>Выберите чат</h3>
+                <p>Начните общение с друзьями</p>
+            </div>
+            <header class="chat-head" id="chatHead" style="display:none">
+                <button class="icon-btn chat-head-back ripple" id="backBtn"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>
+                <img id="chatAvatar" src="" onclick="showChatInfo()">
+                <div class="chat-head-info" onclick="showChatInfo()">
+                    <div class="chat-head-name" id="chatName"></div>
+                    <div class="chat-head-status" id="chatStatus"></div>
+                </div>
+            </header>
+            <div class="messages" id="messages" style="display:none"></div>
+            <div class="typing" id="typing"><div class="typing-bubble"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>
+            <div class="image-preview" id="imagePreview">
+                <div class="preview-container">
+                    <img id="previewImage" src="">
+                    <button class="preview-remove" onclick="clearImagePreview()">&times;</button>
+                </div>
+            </div>
+            <div class="input-area" id="inputArea" style="display:none">
+                <div class="input-wrap">
+                    <div class="input-actions">
+                        <button class="icon-btn small ripple" onclick="document.getElementById('imageInput').click()" title="Отправить фото">
+                            <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                        </button>
+                    </div>
+                    <textarea id="msgInput" placeholder="Сообщение..." rows="1"></textarea>
+                    <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="previewImage(this)">
+                </div>
+                <button class="send-btn ripple" id="sendBtn" onclick="sendMsg()">
+                    <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+            </div>
+        </main>
+    </div>
+    <!-- Modals -->
+    
+    <!-- New Chat Modal -->
+    <div class="modal" id="newChatModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Новый чат</h2>
+                <button class="icon-btn ripple" onclick="closeModal('newChatModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <div class="search" style="padding:0 0 12px"><input type="text" id="userSearch" placeholder="Поиск пользователей..." oninput="searchUsers(this.value)"></div>
+                <div id="userList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Group Modal -->
+    <div class="modal" id="createGroupModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Создать группу</h2>
+                <button class="icon-btn ripple" onclick="closeModal('createGroupModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <div class="field">
+                    <label>Название группы</label>
+                    <input type="text" id="groupName" placeholder="Введите название" maxlength="50">
+                </div>
+                <div class="field">
+                    <label>Описание (необязательно)</label>
+                    <textarea id="groupDesc" placeholder="О чём эта группа?" maxlength="200"></textarea>
+                </div>
+                <div class="field">
+                    <label>Добавить участников</label>
+                    <div class="search" style="padding:0"><input type="text" id="groupUserSearch" placeholder="Поиск..." oninput="searchUsersForGroup(this.value)"></div>
+                    <div class="group-members" id="selectedMembers"></div>
+                    <div id="groupUserList" style="max-height:200px;overflow-y:auto;margin-top:12px"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('createGroupModal')">Отмена</button>
+                <button class="btn btn-primary btn-sm" onclick="createGroup()">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Настройки</h2>
+                <button class="icon-btn ripple" onclick="closeModal('settingsModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h3>Аккаунт</h3>
+                    <div class="settings-item" onclick="showModal('profileModal')">
+                        <div class="settings-label">
+                            <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                            <span>Редактировать профиль</span>
+                        </div>
+                        <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:var(--text2)"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+                    </div>
+                    <div class="settings-item" onclick="showModal('avatarModal')">
+                        <div class="settings-label">
+                            <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                            <span>Изменить аватар</span>
+                        </div>
+                        <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:var(--text2)"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Активные сессии</h3>
+                    <div id="sessionsList"></div>
+                    <button class="btn btn-secondary btn-sm" onclick="loadSessions()">Обновить</button>
+                </div>
+                <div class="settings-section">
+                    <h3>Безопасность</h3>
+                    <div class="settings-item" onclick="toggle2FA()">
+                        <div class="settings-label">
+                            <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                            <span>Двухфакторная аутентификация</span>
+                        </div>
+                        <div class="toggle" id="tfaToggle"></div>
+                    </div>
+                </div>
+                <div class="danger-zone">
+                    <h4>⚠️ Опасная зона</h4>
+                    <p>Удаление аккаунта необратимо. Все ваши данные будут удалены.</p>
+                    <button class="btn btn-danger btn-sm" onclick="showModal('deleteAccountModal')" style="margin-top:8px">Удалить аккаунт</button>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Create Group Modal -->
-        <div class="modal" id="createGroupModal">
-            <div class="modal-box">
-                <div class="modal-head">
-                    <h2>Создать группу</h2>
-                    <button class="icon-btn ripple" onclick="closeModal('createGroupModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    <!-- Profile Modal -->
+    <div class="modal" id="profileModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Профиль</h2>
+                <button class="icon-btn ripple" onclick="closeModal('profileModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <div class="profile-header">
+                    <img class="profile-avatar" id="profileAvatar" src="" onclick="showModal('avatarModal')">
+                    <div class="profile-name" id="profileDisplayName"></div>
+                    <div class="profile-username" id="profileUsername"></div>
                 </div>
-                <div class="modal-body">
-                    <div class="field">
-                        <label>Название группы</label>
-                        <input type="text" id="groupName" placeholder="Введите название" maxlength="50">
-                    </div>
-                    <div class="field">
-                        <label>Описание (необязательно)</label>
-                        <textarea id="groupDesc" placeholder="О чём эта группа?" maxlength="200"></textarea>
-                    </div>
-                    <div class="field">
-                        <label>Добавить участников</label>
-                        <div class="search" style="padding:0"><input type="text" id="groupUserSearch" placeholder="Поиск..." oninput="searchUsersForGroup(this.value)"></div>
-                        <div class="group-members" id="selectedMembers"></div>
-                        <div id="groupUserList" style="max-height:200px;overflow-y:auto;margin-top:12px"></div>
-                    </div>
+                <div class="field">
+                    <label>Отображаемое имя</label>
+                    <input type="text" id="editDisplayName" maxlength="50">
                 </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary btn-sm" onclick="closeModal('createGroupModal')">Отмена</button>
-                    <button class="btn btn-primary btn-sm" onclick="createGroup()">Создать</button>
+                <div class="field">
+                    <label>О себе</label>
+                    <textarea id="editBio" placeholder="Расскажите о себе..." maxlength="200"></textarea>
+                </div>
+                <div class="field">
+                    <label>Пол</label>
+                    <select id="editGender">
+                        <option value="male">Мужской</option>
+                        <option value="female">Женский</option>
+                        <option value="other">Другое</option>
+                    </select>
                 </div>
             </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('profileModal')">Отмена</button>
+                <button class="btn btn-primary btn-sm" onclick="saveProfile()">Сохранить</button>
+            </div>
         </div>
+    </div>
 
-        <!-- Settings Modal -->
-        <div class="modal" id="settingsModal">
-            <div class="modal-box">
-                <div class="modal-head">
-                    <h2>Настройки</h2>
-                    <button class="icon-btn ripple" onclick="closeModal('settingsModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    <!-- Avatar Modal -->
+    <div class="modal" id="avatarModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Изменить аватар</h2>
+                <button class="icon-btn ripple" onclick="closeModal('avatarModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <div class="avatar-upload">
+                    <label class="avatar-upload-preview" id="avatarPreviewLabel">
+                        <img id="avatarPreviewImg" src="" style="display:none">
+                        <svg viewBox="0 0 24 24" id="avatarPlaceholder"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>
+                        <input type="file" id="avatarInput" accept="image/*" onchange="previewAvatar(this)">
+                    </label>
+                    <p style="color:var(--text2);font-size:13px;text-align:center">Нажмите чтобы выбрать фото<br>Макс. размер: 500KB</p>
                 </div>
-                <div class="modal-body">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('avatarModal')">Отмена</button>
+                <button class="btn btn-primary btn-sm" onclick="uploadAvatar()" id="uploadAvatarBtn" disabled>Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2FA Setup Modal -->
+    <div class="modal" id="tfaSetupModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Настройка 2FA</h2>
+                <button class="icon-btn ripple" onclick="closeModal('tfaSetupModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body" style="text-align:center">
+                <p style="margin-bottom:16px">Отсканируйте QR-код в Google Authenticator</p>
+                <img id="tfaQR" src="" style="max-width:200px;border-radius:10px;margin-bottom:16px">
+                <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Или введите код вручную:</p>
+                <div style="background:var(--bg3);padding:12px;border-radius:8px;font-family:monospace;margin-bottom:20px;word-break:break-all" id="tfaSecret"></div>
+                <div class="field">
+                    <label>Введите код из приложения</label>
+                    <input type="text" id="tfaConfirmCode" maxlength="6" inputmode="numeric" placeholder="123456" style="text-align:center;font-size:24px;letter-spacing:8px">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('tfaSetupModal')">Отмена</button>
+                <button class="btn btn-primary btn-sm" onclick="confirm2FA()">Активировать</button>
+            </div>
+        </div>
+    </div>
+        <!-- Delete Account Modal -->
+    <div class="modal" id="deleteAccountModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2 style="color:var(--danger)">⚠️ Удаление аккаунта</h2>
+                <button class="icon-btn ripple" onclick="closeModal('deleteAccountModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--danger);margin-bottom:16px;font-weight:600">Это действие необратимо!</p>
+                <p style="color:var(--text2);margin-bottom:20px;font-size:14px">Будут удалены: ваш профиль, все сообщения, группы (если вы владелец) и все данные.</p>
+                <div class="field">
+                    <label>Введите пароль</label>
+                    <input type="password" id="deletePassword">
+                </div>
+                <div class="field">
+                    <label>Введите "DELETE MY ACCOUNT"</label>
+                    <input type="text" id="deleteConfirmation" placeholder="DELETE MY ACCOUNT">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('deleteAccountModal')">Отмена</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteAccount()">Удалить навсегда</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Group Info Modal -->
+    <div class="modal" id="groupInfoModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Информация о группе</h2>
+                <button class="icon-btn ripple" onclick="closeModal('groupInfoModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <div class="profile-header">
+                    <img class="profile-avatar" id="groupInfoAvatar" src="">
+                    <div class="profile-name" id="groupInfoName"></div>
+                    <div class="profile-username" id="groupInfoDesc"></div>
+                </div>
+                <div class="settings-section">
+                    <h3>Участники (<span id="groupMemberCount">0</span>)</h3>
+                    <div id="groupMembersList"></div>
+                </div>
+                <div id="groupAdminActions" style="display:none">
                     <div class="settings-section">
-                        <h3>Аккаунт</h3>
-                        <div class="settings-item" onclick="showModal('profileModal')">
+                        <h3>Управление</h3>
+                        <div class="settings-item" onclick="showAddMemberModal()">
                             <div class="settings-label">
-                                <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                                <span>Редактировать профиль</span>
+                                <svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                                <span>Добавить участника</span>
                             </div>
-                            <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:var(--text2)"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-                        </div>
-                        <div class="settings-item" onclick="showModal('avatarModal')">
-                            <div class="settings-label">
-                                <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-                                <span>Изменить аватар</span>
-                            </div>
-                            <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:var(--text2)"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-                        </div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>Активные сессии</h3>
-                        <div id="sessionsList"></div>
-                        <button class="btn btn-secondary btn-sm" onclick="loadSessions()">Обновить</button>
-                    </div>
-                    <div class="settings-section">
-                        <h3>Безопасность</h3>
-                        <div class="settings-item" onclick="toggle2FA()">
-                            <div class="settings-label">
-                                <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-                                <span>Двухфакторная аутентификация</span>
-                            </div>
-                            <div class="toggle" id="tfaToggle"></div>
                         </div>
                     </div>
                     <div class="danger-zone">
                         <h4>⚠️ Опасная зона</h4>
-                        <p>Удаление аккаунта необратимо. Все ваши данные будут удалены.</p>
-                        <button class="btn btn-danger btn-sm" onclick="showModal('deleteAccountModal')" style="margin-top:8px">Удалить аккаунт</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteGroup()" style="margin-top:8px">Удалить группу</button>
                     </div>
                 </div>
+                <button class="btn btn-secondary" onclick="leaveGroup()" style="margin-top:16px" id="leaveGroupBtn">Покинуть группу</button>
             </div>
         </div>
+    </div>
 
-        <!-- Profile Modal -->
-        <div class="modal" id="profileModal">
-            <div class="modal-box">
-                <div class="modal-head">
-                    <h2>Профиль</h2>
-                    <button class="icon-btn ripple" onclick="closeModal('profileModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    <!-- User Profile Modal -->
+    <div class="modal" id="userProfileModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Профиль</h2>
+                <button class="icon-btn ripple" onclick="closeModal('userProfileModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <div class="profile-header">
+                    <img class="profile-avatar" id="userProfileAvatar" src="">
+                    <div class="profile-name" id="userProfileName"></div>
+                    <div class="profile-username" id="userProfileUsername"></div>
                 </div>
-                <div class="modal-body">
-                    <div class="profile-header">
-                        <img class="profile-avatar" id="profileAvatar" src="" onclick="showModal('avatarModal')">
-                        <div class="profile-name" id="profileDisplayName"></div>
-                        <div class="profile-username" id="profileUsername"></div>
-                    </div>
-                    <div class="field">
-                        <label>Отображаемое имя</label>
-                        <input type="text" id="editDisplayName" maxlength="50">
-                    </div>
-                    <div class="field">
-                        <label>О себе</label>
-                        <textarea id="editBio" placeholder="Расскажите о себе..." maxlength="200"></textarea>
-                    </div>
-                    <div class="field">
-                        <label>Пол</label>
-                        <select id="editGender">
-                            <option value="male">Мужской</option>
-                            <option value="female">Женский</option>
-                            <option value="other">Другое</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary btn-sm" onclick="closeModal('profileModal')">Отмена</button>
-                    <button class="btn btn-primary btn-sm" onclick="saveProfile()">Сохранить</button>
-                </div>
+                <p style="text-align:center;color:var(--text2);padding:20px" id="userProfileBio"></p>
+                <button class="btn btn-primary" onclick="startChatWithUser()" id="startChatBtn">Написать сообщение</button>
             </div>
         </div>
-
-        <!-- Avatar Modal -->
-        <div class="modal" id="avatarModal">
-            <div class="modal-box">
-                <div class="modal-head">
-                    <h2>Изменить аватар</h2>
-                    <button class="icon-btn ripple" onclick="closeModal('avatarModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-                </div>
-                <div class="modal-body">
-                    <div class="avatar-upload">
-                        <label class="avatar-upload-preview" id="avatarPreviewLabel">
-                            <img id="avatarPreviewImg" src="" style="display:none">
-                            <svg viewBox="0 0 24 24" id="avatarPlaceholder"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>
-                            <input type="file" id="avatarInput" accept="image/*" onchange="previewAvatar(this)">
-                        </label>
-                        <p style="color:var(--text2);font-size:13px;text-align:center">Нажмите чтобы выбрать фото<br>Макс. размер: 500KB</p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary btn-sm" onclick="closeModal('avatarModal')">Отмена</button>
-                    <button class="btn btn-primary btn-sm" onclick="uploadAvatar()" id="uploadAvatarBtn" disabled>Сохранить</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2FA Setup Modal -->
-        <div class="modal" id="tfaSetupModal">
-            <div class="modal-box">
-                <div class="modal-head">
-                    <h2>Настройка 2FA</h2>
-                    <button class="icon-btn ripple" onclick="closeModal('tfaSetupModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-                </div>
-                <div class="modal-body" style="text-align:center">
-                    <p style="margin-bottom:16px">Отсканируйте QR-код в Google Authenticator</p>
-                    <img id="tfaQR" src="" style="max-width:200px;border-radius:10px;margin-bottom:16px">
-                    <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Или введите код вручную:</p>
-                    <div style="background:var(--bg3);padding:12px;border-radius:8px;font-family:monospace;margin-bottom:20px;word-break:break-all" id="tfaSecret"></div>
-                    <div class="field">
-                        <label>Введите код из приложения</label>
-                        <input type="text" id="tfaConfirmCode" maxlength="6" inputmode="numeric" placeholder="123456" style="text-align:center;font-size:24px;letter-spacing:8px">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary btn-sm" onclick="closeModal('tfaSetupModal')">Отмена</button>
-                    <button class="btn btn-primary btn-sm" onclick="confirm2FA()">Активировать</button>
-                </div>
-            </div>
-        </div>
-            <!-- Delete Account Modal -->
-        <div class="modal" id="deleteAccountModal">
-            <div class="modal-box">
-                <div class="modal-head">
-                    <h2 style="color:var(--danger)">⚠️ Удаление аккаунта</h2>
-                    <button class="icon-btn ripple" onclick="closeModal('deleteAccountModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-                </div>
-                <div class="modal-body">
-                    <p style="color:var(--danger);margin-bottom:16px;font-weight:600">Это действие необратимо!</p>
-                    <p style="color:var(--text2);margin-bottom:20px;font-size:14px">Будут удалены: ваш профиль, все сообщения, группы (если вы владелец) и все данные.</p>
-                    <div class="field">
-                        <label>Введите пароль</label>
-                        <input type="password" id="deletePassword">
-                    </div>
-                    <div class="field">
-                        <label>Введите "DELETE MY ACCOUNT"</label>
-                        <input type="text" id="deleteConfirmation" placeholder="DELETE MY ACCOUNT">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary btn-sm" onclick="closeModal('deleteAccountModal')">Отмена</button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteAccount()">Удалить навсегда</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Group Info Modal -->
-        <div class="modal" id="groupInfoModal">
-            <div class="modal-box">
-                <div class="modal-head">
-                    <h2>Информация о группе</h2>
-                    <button class="icon-btn ripple" onclick="closeModal('groupInfoModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-                </div>
-                <div class="modal-body">
-                    <div class="profile-header">
-                        <img class="profile-avatar" id="groupInfoAvatar" src="">
-                        <div class="profile-name" id="groupInfoName"></div>
-                        <div class="profile-username" id="groupInfoDesc"></div>
-                    </div>
-                    <div class="settings-section">
-                        <h3>Участники (<span id="groupMemberCount">0</span>)</h3>
-                        <div id="groupMembersList"></div>
-                    </div>
-                    <div id="groupAdminActions" style="display:none">
-                        <div class="settings-section">
-                            <h3>Управление</h3>
-                            <div class="settings-item" onclick="showAddMemberModal()">
-                                <div class="settings-label">
-                                    <svg viewBox="0 0 24 24"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                                    <span>Добавить участника</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="danger-zone">
-                            <h4>⚠️ Опасная зона</h4>
-                            <button class="btn btn-danger btn-sm" onclick="deleteGroup()" style="margin-top:8px">Удалить группу</button>
-                        </div>
-                    </div>
-                    <button class="btn btn-secondary" onclick="leaveGroup()" style="margin-top:16px" id="leaveGroupBtn">Покинуть группу</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- User Profile Modal -->
-        <div class="modal" id="userProfileModal">
-            <div class="modal-box">
-                <div class="modal-head">
-                    <h2>Профиль</h2>
-                    <button class="icon-btn ripple" onclick="closeModal('userProfileModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-                </div>
-                <div class="modal-body">
-                    <div class="profile-header">
-                        <img class="profile-avatar" id="userProfileAvatar" src="">
-                        <div class="profile-name" id="userProfileName"></div>
-                        <div class="profile-username" id="userProfileUsername"></div>
-                    </div>
-                    <p style="text-align:center;color:var(--text2);padding:20px" id="userProfileBio"></p>
-                    <button class="btn btn-primary" onclick="startChatWithUser()" id="startChatBtn">Написать сообщение</button>
-                </div>
-            </div>
-        </div>
+    </div>
 
     <script>
+    // ============================================
+    // КРИПТОГРАФИЯ E2E - НОВЫЙ КОД
+    // ============================================
+    const CryptoHelper = {
+        // Генерация ключевой пары
+        async generateKeyPair() {
+            const keyPair = await crypto.subtle.generateKey(
+                {
+                    name: 'RSA-OAEP',
+                    modulusLength: 2048,
+                    publicExponent: new Uint8Array([1, 0, 1]),
+                    hash: 'SHA-256',
+                },
+                true,
+                ['encrypt', 'decrypt']
+            );
+            
+            const publicKey = await crypto.subtle.exportKey('spki', keyPair.publicKey);
+            const privateKey = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+            
+            return {
+                publicKey: this.arrayBufferToBase64(publicKey),
+                privateKey: this.arrayBufferToBase64(privateKey)
+            };
+        },
+        
+        // Шифрование сообщения
+        async encryptMessage(message, recipientPublicKey) {
+            try {
+                // Генерируем симметричный ключ
+                const symmetricKey = await crypto.subtle.generateKey(
+                    { name: 'AES-GCM', length: 256 },
+                    true,
+                    ['encrypt', 'decrypt']
+                );
+                
+                // Шифруем сообщение
+                const nonce = crypto.getRandomValues(new Uint8Array(12));
+                const encoder = new TextEncoder();
+                const encodedMessage = encoder.encode(message);
+                
+                const encryptedContent = await crypto.subtle.encrypt(
+                    { name: 'AES-GCM', iv: nonce },
+                    symmetricKey,
+                    encodedMessage
+                );
+                
+                // Экспортируем симметричный ключ
+                const exportedKey = await crypto.subtle.exportKey('raw', symmetricKey);
+                
+                // Шифруем ключ публичным ключом получателя
+                const importedPublicKey = await crypto.subtle.importKey(
+                    'spki',
+                    this.base64ToArrayBuffer(recipientPublicKey),
+                    { name: 'RSA-OAEP', hash: 'SHA-256' },
+                    false,
+                    ['encrypt']
+                );
+                
+                const encryptedKey = await crypto.subtle.encrypt(
+                    { name: 'RSA-OAEP' },
+                    importedPublicKey,
+                    exportedKey
+                );
+                
+                return {
+                    encryptedContent: this.arrayBufferToBase64(encryptedContent),
+                    encryptedKey: this.arrayBufferToBase64(encryptedKey),
+                    nonce: this.arrayBufferToBase64(nonce)
+                };
+            } catch (error) {
+                console.error('Encryption error:', error);
+                throw new Error('Не удалось зашифровать сообщение');
+            }
+        },
+        
+        // Расшифровка сообщения
+        async decryptMessage(encryptedData, privateKey) {
+            try {
+                // Импортируем приватный ключ
+                const importedPrivateKey = await crypto.subtle.importKey(
+                    'pkcs8',
+                    this.base64ToArrayBuffer(privateKey),
+                    { name: 'RSA-OAEP', hash: 'SHA-256' },
+                    false,
+                    ['decrypt']
+                );
+                
+                // Расшифровываем симметричный ключ
+                const decryptedKey = await crypto.subtle.decrypt(
+                    { name: 'RSA-OAEP' },
+                    importedPrivateKey,
+                    this.base64ToArrayBuffer(encryptedData.encryptedKey)
+                );
+                
+                // Импортируем симметричный ключ
+                const symmetricKey = await crypto.subtle.importKey(
+                    'raw',
+                    decryptedKey,
+                    { name: 'AES-GCM' },
+                    false,
+                    ['decrypt']
+                );
+                
+                // Расшифровываем сообщение
+                const decryptedContent = await crypto.subtle.decrypt(
+                    {
+                        name: 'AES-GCM',
+                        iv: this.base64ToArrayBuffer(encryptedData.nonce)
+                    },
+                    symmetricKey,
+                    this.base64ToArrayBuffer(encryptedData.encryptedContent)
+                );
+                
+                const decoder = new TextDecoder();
+                return decoder.decode(decryptedContent);
+            } catch (error) {
+                console.error('Decryption error:', error);
+                return '🔒 [Не удалось расшифровать]';
+            }
+        },
+        
+        // Сохранение ключей
+        async saveKeys(publicKey, privateKey, password) {
+            const passwordKey = await this.deriveKeyFromPassword(password);
+            const nonce = crypto.getRandomValues(new Uint8Array(12));
+            
+            const encoder = new TextEncoder();
+            const encryptedPrivateKey = await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv: nonce },
+                passwordKey,
+                encoder.encode(privateKey)
+            );
+            
+            localStorage.setItem('alwex_public_key', publicKey);
+            localStorage.setItem('alwex_private_key_encrypted', this.arrayBufferToBase64(encryptedPrivateKey));
+            localStorage.setItem('alwex_private_key_nonce', this.arrayBufferToBase64(nonce));
+        },
+        
+        async loadPrivateKey(password) {
+            const encrypted = localStorage.getItem('alwex_private_key_encrypted');
+            const nonce = localStorage.getItem('alwex_private_key_nonce');
+            
+            if (!encrypted || !nonce) return null;
+            
+            try {
+                const passwordKey = await this.deriveKeyFromPassword(password);
+                
+                const decrypted = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: this.base64ToArrayBuffer(nonce) },
+                    passwordKey,
+                    this.base64ToArrayBuffer(encrypted)
+                );
+                
+                const decoder = new TextDecoder();
+                return decoder.decode(decrypted);
+            } catch (error) {
+                console.error('Failed to load private key:', error);
+                return null;
+            }
+        },
+        
+        async deriveKeyFromPassword(password) {
+            const encoder = new TextEncoder();
+            const passwordBuffer = encoder.encode(password);
+            
+            const passwordKey = await crypto.subtle.importKey(
+                'raw',
+                passwordBuffer,
+                { name: 'PBKDF2' },
+                false,
+                ['deriveBits', 'deriveKey']
+            );
+            
+            return await crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: encoder.encode('AlwexMessenger2026'),
+                    iterations: 100000,
+                    hash: 'SHA-256'
+                },
+                passwordKey,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        },
+        
+        arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        },
+        
+        base64ToArrayBuffer(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+    };
+
+    // ============================================
+    // ОСНОВНОЙ КОД ПРИЛОЖЕНИЯ (оригинальный с изменениями)
+    // ============================================
+
     const API = '';
     let token = localStorage.getItem('alwex_token');
     let user = JSON.parse(localStorage.getItem('alwex_user') || 'null');
+    let privateKey = null;  // добавлено
     let currentChat = null;
     let currentChatType = null;
     let users = {};
@@ -731,9 +959,7 @@
                     method: 'HEAD',
                     headers: { 'X-Device-Fingerprint': getFP() }
                 });
-            } catch (e) {
-                // игнорируем
-            }
+            } catch (e) {}
         }, 30000);
     }
 
@@ -845,7 +1071,7 @@
             ws.close();
         }
         currentChatId = chatId;
-        const wsUrl = \`wss://\${window.location.host}/api/ws?chatId=\${chatId}&userId=\${user.id}&token=\${token}\`;
+        const wsUrl = `wss://${window.location.host}/api/ws?chatId=${chatId}&userId=${user.id}&token=${token}`;
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
@@ -853,21 +1079,21 @@
         };
 
         ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'message') {
-            addMessageToUI(data.message, currentChatType === 'group');
-            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-        } else if (data.type === 'delete') {
-            const msgDiv = document.querySelector('.message[data-message-id=String(data.messageId)]');
-            if (msgDiv) msgDiv.remove();
-        } else if (data.type === 'user_left') {
-            toast('Пользователь вышел', '', 'info');
-        } else if (data.type === 'connected') {
-            console.log('WebSocket ready');
-        }
-    };
+            const data = JSON.parse(event.data);
+            if (data.type === 'message') {
+                addMessageToUI(data.message, currentChatType === 'group');
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            } else if (data.type === 'delete') {
+                const msgDiv = document.querySelector('.message[data-message-id=' + data.messageId + ']');
+                if (msgDiv) msgDiv.remove();
+            } else if (data.type === 'user_left') {
+                toast('Пользователь вышел', '', 'info');
+            } else if (data.type === 'connected') {
+                console.log('WebSocket ready');
+            }
+        };
 
-        ws.onclose = () => {
+        ws.onclose = (event) => {
             console.log('WebSocket closed', event.code, event.reason);
             ws = null;
             if (currentChatId) {
@@ -912,6 +1138,7 @@
         };
     });
 
+    // ===== РЕГИСТРАЦИЯ (обновлено с E2E) =====
     document.getElementById('registerForm').onsubmit = async e => {
         e.preventDefault();
         if (!selectedGender) {
@@ -922,30 +1149,39 @@
         const btn = document.getElementById('registerBtn');
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner"></span>';
-
+        
+        // Генерируем ключевую пару
+        const keys = await CryptoHelper.generateKeyPair();
+        
+        // Сохраняем ключи локально
+        await CryptoHelper.saveKeys(keys.publicKey, keys.privateKey, document.getElementById('regPass').value);
+        
         const data = await api('/api/register', {
             method: 'POST', body: {
                 username: document.getElementById('regUser').value,
                 email: document.getElementById('regEmail').value,
                 password: document.getElementById('regPass').value,
-                gender: selectedGender
+                gender: selectedGender,
+                publicKey: keys.publicKey   // добавили публичный ключ
             }
         });
-
+        
         btn.disabled = false;
         btn.innerHTML = '<span>Создать аккаунт</span>';
-
+        
         if (data.error) {
             document.getElementById('authError').textContent = data.error;
             document.getElementById('authError').classList.add('show');
             return;
         }
-
+        
         token = data.token;
         user = data.user;
+        privateKey = keys.privateKey;   // сохраняем приватный ключ в памяти
+        
         localStorage.setItem('alwex_token', token);
         localStorage.setItem('alwex_user', JSON.stringify(user));
-
+        
         if (data.verificationRequired) {
             document.getElementById('authSuccess').innerHTML = 'Код подтверждения: <strong>' + data._demoCode + '</strong>';
             document.getElementById('authSuccess').classList.add('show');
@@ -958,6 +1194,46 @@
         } else {
             showApp();
         }
+    };
+
+    // ===== ВХОД (обновлено с E2E) =====
+    document.getElementById('loginForm').onsubmit = async e => {
+        e.preventDefault();
+        const btn = document.getElementById('loginBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+
+        const body = { username: document.getElementById('loginUser').value, password: document.getElementById('loginPass').value };
+        const tfaCode = document.getElementById('tfaCode').value;
+        if (tfaCode) body.twoFactorCode = tfaCode;
+
+        const data = await api('/api/login', { method: 'POST', body });
+        btn.disabled = false;
+        btn.innerHTML = '<span>Войти</span>';
+
+        if (data.twoFactorRequired) {
+            document.getElementById('tfaField').style.display = 'block';
+            document.getElementById('tfaCode').focus();
+            toast('Требуется 2FA', 'Введите код из приложения', 'info');
+            return;
+        }
+        if (data.error) {
+            document.getElementById('authError').textContent = data.error;
+            document.getElementById('authError').classList.add('show');
+            return;
+        }
+        token = data.token;
+        user = data.user;
+        
+        // Загружаем приватный ключ
+        privateKey = await CryptoHelper.loadPrivateKey(document.getElementById('loginPass').value);
+        if (!privateKey) {
+            toast('Ошибка', 'Не удалось загрузить ключи шифрования', 'error');
+        }
+        
+        localStorage.setItem('alwex_token', token);
+        localStorage.setItem('alwex_user', JSON.stringify(user));
+        showApp();
     };
 
     document.getElementById('verifyForm').onsubmit = async e => {
@@ -1007,44 +1283,15 @@
 
     async function resendCode() { toast('Код отправлен', 'Проверьте email', 'success'); }
 
-    document.getElementById('loginForm').onsubmit = async e => {
-        e.preventDefault();
-        const btn = document.getElementById('loginBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span>';
-
-        const body = { username: document.getElementById('loginUser').value, password: document.getElementById('loginPass').value };
-        const tfaCode = document.getElementById('tfaCode').value;
-        if (tfaCode) body.twoFactorCode = tfaCode;
-
-        const data = await api('/api/login', { method: 'POST', body });
-        btn.disabled = false;
-        btn.innerHTML = '<span>Войти</span>';
-
-        if (data.twoFactorRequired) {
-            document.getElementById('tfaField').style.display = 'block';
-            document.getElementById('tfaCode').focus();
-            toast('Требуется 2FA', 'Введите код из приложения', 'info');
-            return;
-        }
-        if (data.error) {
-            document.getElementById('authError').textContent = data.error;
-            document.getElementById('authError').classList.add('show');
-            return;
-        }
-        token = data.token;
-        user = data.user;
-        localStorage.setItem('alwex_token', token);
-        localStorage.setItem('alwex_user', JSON.stringify(user));
-        showApp();
-    };
-
     async function logout() {
         if (!confirm('Выйти из аккаунта?')) return;
         disconnectWebSocket();
         await api('/api/logout', { method: 'POST' });
         localStorage.removeItem('alwex_token');
         localStorage.removeItem('alwex_user');
+        localStorage.removeItem('alwex_public_key');
+        localStorage.removeItem('alwex_private_key_encrypted');
+        localStorage.removeItem('alwex_private_key_nonce');
         location.reload();
     }
 
@@ -1087,33 +1334,33 @@
                 users[c.user.id] = c.user;
                 const onlineDot = c.user.online ? '<div class="online-dot"></div>' : '';
                 const unreadBadge = c.unread ? '<span class="unread">' + c.unread + '</span>' : '';
-                list.innerHTML += \`
-                    <div class="chat-item" onclick="openDirectChat(\${c.user.id})">
-                        <div class="avatar-wrap"><img src="\${escapeHtml(c.user.avatar)}">\${onlineDot}</div>
+                list.innerHTML += `
+                    <div class="chat-item" onclick="openDirectChat(${c.user.id})">
+                        <div class="avatar-wrap"><img src="${escapeHtml(c.user.avatar)}">${onlineDot}</div>
                         <div class="chat-item-info">
-                            <div class="chat-item-name">\${escapeHtml(c.user.displayName || c.user.username)}</div>
-                            <div class="chat-item-msg">\${escapeHtml(c.lastMessage || 'Начните общение')}</div>
+                            <div class="chat-item-name">${escapeHtml(c.user.displayName || c.user.username)}</div>
+                            <div class="chat-item-msg">${escapeHtml(c.lastMessage || 'Начните общение')}</div>
                         </div>
                         <div class="chat-item-meta">
-                            <span class="chat-item-time">\${fmtTime(c.lastTime)}</span>
-                            \${unreadBadge}
+                            <span class="chat-item-time">${fmtTime(c.lastTime)}</span>
+                            ${unreadBadge}
                         </div>
                     </div>
-                \`;
+                `;
             } else if (c.type === 'group') {
                 groups[c.group.id] = c.group;
-                list.innerHTML += \`
-                    <div class="chat-item" onclick="openGroupChat(\${c.group.id})">
-                        <div class="avatar-wrap"><img src="\${escapeHtml(c.group.avatar)}"></div>
+                list.innerHTML += `
+                    <div class="chat-item" onclick="openGroupChat(${c.group.id})">
+                        <div class="avatar-wrap"><img src="${escapeHtml(c.group.avatar)}"></div>
                         <div class="chat-item-info">
-                            <div class="chat-item-name">\${escapeHtml(c.group.name)} <span class="badge">Группа</span></div>
-                            <div class="chat-item-msg">\${escapeHtml(c.lastMessage || 'Нет сообщений')}</div>
+                            <div class="chat-item-name">${escapeHtml(c.group.name)} <span class="badge">Группа</span></div>
+                            <div class="chat-item-msg">${escapeHtml(c.lastMessage || 'Нет сообщений')}</div>
                         </div>
                         <div class="chat-item-meta">
-                            <span class="chat-item-time">\${fmtTime(c.lastTime)}</span>
+                            <span class="chat-item-time">${fmtTime(c.lastTime)}</span>
                         </div>
                     </div>
-                \`;
+                `;
             }
         });
     }
@@ -1171,7 +1418,8 @@
         container.scrollTop = container.scrollHeight;
     }
 
-    function addMessageToUI(m, showSender = false) {
+    // ===== ОТОБРАЖЕНИЕ СООБЩЕНИЯ (обновлено с E2E) =====
+    async function addMessageToUI(m, showSender = false) {
         const container = document.getElementById('messages');
         const isOwn = m.senderId === user.id;
         const msgDiv = document.createElement('div');
@@ -1180,27 +1428,53 @@
 
         let content = '';
         if (showSender && !isOwn) {
-            content += \`<div class="msg-sender">\${escapeHtml(m.senderName || 'User')}</div>\`;
+            content += `<div class="msg-sender">${escapeHtml(m.senderName || 'User')}</div>`;
         }
+        
+        // Расшифровываем сообщение, если оно зашифровано
+        let messageText = m.content;
+        if (m.encryptedContent && privateKey) {
+            try {
+                messageText = await CryptoHelper.decryptMessage({
+                    encryptedContent: m.encryptedContent,
+                    encryptedKey: m.encryptedKey,
+                    nonce: m.nonce
+                }, privateKey);
+            } catch (e) {
+                messageText = '🔒 [Зашифровано]';
+            }
+        }
+        
         if (m.type === 'image' && m.mediaData) {
-            content += \`<img class="msg-image" src="\${escapeHtml(m.mediaData)}" onclick="viewImage(this.src)">\`;
+            content += `<img class="msg-image" src="${escapeHtml(m.mediaData)}" onclick="viewImage(this.src)">`;
         } else {
-            content += \`<div class="msg-text">\${escapeHtml(m.content || '')}</div>\`;
+            content += `<div class="msg-text">${escapeHtml(messageText || '')}</div>`;
         }
-        content += \`<div class="msg-time">\${fmtTime(m.createdAt)}</div>\`;
+        content += `<div class="msg-time">${fmtTime(m.createdAt)}</div>`;
 
         if (isOwn) {
-            content += \`<button class="delete-msg-btn" onclick="deleteMessage(\${m.id})">🗑️</button>\`;
+            content += `<button class="delete-msg-btn" onclick="deleteMessage(${m.id})">🗑️</button>`;
         }
 
-        msgDiv.innerHTML = \`<div class="msg-bubble">\${content}</div>\`;
+        // Добавляем бейдж шифрования, если сообщение зашифровано
+        if (m.encryptedContent) {
+            content += `
+                <span class="encrypted-badge">
+                    <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                    E2E
+                </span>
+            `;
+        }
+
+        msgDiv.innerHTML = `<div class="msg-bubble">${content}</div>`;
         container.appendChild(msgDiv);
     }
+
     async function deleteMessage(messageId) {
         if (!confirm('Удалить сообщение?')) return;
         const data = await api('/api/messages/' + messageId, { method: 'DELETE' });
         if (data.success) {
-            const msgDiv = document.querySelector(\`.message[data-message-id="\${messageId}"]\`);
+            const msgDiv = document.querySelector(`.message[data-message-id="${messageId}"]`);
             if (msgDiv) msgDiv.remove();
             toast('Сообщение удалено', '', 'success');
         } else {
@@ -1224,6 +1498,7 @@
     document.getElementById('msgInput').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } };
     document.getElementById('msgInput').oninput = function () { this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 120) + 'px'; };
 
+    // ===== ОТПРАВКА СООБЩЕНИЯ (обновлено с E2E) =====
     async function sendMsg() {
         const input = document.getElementById('msgInput');
         const content = input.value.trim();
@@ -1240,30 +1515,49 @@
             body.groupId = currentChat.id;
         }
 
+        // Если есть изображение, отправляем как есть (не шифруем)
         if (pendingImage) {
             body.type = 'image';
             body.mediaData = pendingImage;
             body.content = '';
         } else {
             body.type = 'text';
-            body.content = content;
+            // Шифруем текст
+            if (currentChatType === 'direct') {
+                // Получаем публичный ключ собеседника
+                const recipientPublicKey = users[currentChat.id]?.publicKey;
+                if (recipientPublicKey && privateKey) {
+                    try {
+                        const encrypted = await CryptoHelper.encryptMessage(content, recipientPublicKey);
+                        body.encryptedContent = encrypted.encryptedContent;
+                        body.encryptedKey = encrypted.encryptedKey;
+                        body.nonce = encrypted.nonce;
+                        body.content = ''; // не отправляем открытый текст
+                    } catch (e) {
+                        toast('Ошибка шифрования', 'Не удалось зашифровать сообщение', 'error');
+                        return;
+                    }
+                } else {
+                    // Если нет ключа, отправляем открытым текстом (для совместимости)
+                    body.content = content;
+                }
+            } else {
+                // Для группы пока отправляем открытым текстом (позже можно реализовать шифрование для каждого участника)
+                body.content = content;
+            }
         }
 
         input.value = '';
         input.style.height = 'auto';
 
-        console.log('🔍 sendMsg: pendingImage before send =', pendingImage ? pendingImage.slice(0, 50) + '...' : 'null');
-        console.log('🔍 sendMsg: pendingImage length =', pendingImage ? pendingImage.length : 0);
-
         if (ws && ws.readyState === WebSocket.OPEN) {
-            // Создаём локальное сообщение
-            const localPendingImage = pendingImage; // копируем до возможной очистки
+            // Создаём локальное сообщение (для отображения)
             const localMessage = {
                 id: msgId,
                 senderId: user.id,
                 content: content,
-                type: localPendingImage ? 'image' : 'text',
-                mediaData: localPendingImage || null,
+                type: pendingImage ? 'image' : 'text',
+                mediaData: pendingImage || null,
                 createdAt: Date.now()
             };
             addMessageToUI(localMessage, currentChatType === 'group');
@@ -1274,12 +1568,13 @@
                 clientMessageId: msgId,
                 recipientId: body.recipientId,
                 groupId: body.groupId,
-                content: content,
-                mediaData: localPendingImage
+                content: body.content,
+                encryptedContent: body.encryptedContent,
+                encryptedKey: body.encryptedKey,
+                nonce: body.nonce,
+                mediaData: pendingImage
             }));
 
-            input.value = '';
-            input.style.height = 'auto';
             clearImagePreview();
         } else {
             console.log('WebSocket not open, using HTTP');
@@ -1308,7 +1603,6 @@
         const reader = new FileReader();
         reader.onload = e => {
             pendingImage = e.target.result;
-            console.log('✅ previewImage: image loaded, length =', pendingImage.length);
             document.getElementById('previewImage').src = pendingImage;
             document.getElementById('imagePreview').classList.add('show');
         };
@@ -1317,7 +1611,6 @@
     }
 
     function clearImagePreview() {
-        console.log('clearImagePreview called, pendingImage was', pendingImage ? 'not null' : 'null');
         pendingImage = null;
         document.getElementById('imagePreview').classList.remove('show');
         document.getElementById('previewImage').src = '';
@@ -1375,15 +1668,15 @@
 
         data.users.forEach(u => {
             users[u.id] = u;
-            list.innerHTML += \`
-                <div class="user-item" onclick="startChat(\${u.id})">
-                    <div class="avatar-wrap"><img src="\${escapeHtml(u.avatar)}">\${u.online ? '<div class="online-dot"></div>' : ''}</div>
+            list.innerHTML += `
+                <div class="user-item" onclick="startChat(${u.id})">
+                    <div class="avatar-wrap"><img src="${escapeHtml(u.avatar)}">${u.online ? '<div class="online-dot"></div>' : ''}</div>
                     <div class="user-item-info">
-                        <div class="user-item-name">\${escapeHtml(u.displayName || u.username)}</div>
-                        <div class="user-item-status">\${u.online ? 'в сети' : 'не в сети'}</div>
+                        <div class="user-item-name">${escapeHtml(u.displayName || u.username)}</div>
+                        <div class="user-item-status">${u.online ? 'в сети' : 'не в сети'}</div>
                     </div>
                 </div>
-            \`;
+            `;
         });
     }
 
@@ -1405,15 +1698,15 @@
         data.users.forEach(u => {
             users[u.id] = u;
             const isSelected = selectedGroupMembers.includes(u.id);
-            list.innerHTML += \`
-                <div class="user-item \${isSelected ? 'selected' : ''}" onclick="toggleGroupMember(\${u.id})">
-                    <img src="\${escapeHtml(u.avatar)}">
+            list.innerHTML += `
+                <div class="user-item ${isSelected ? 'selected' : ''}" onclick="toggleGroupMember(${u.id})">
+                    <img src="${escapeHtml(u.avatar)}">
                     <div class="user-item-info">
-                        <div class="user-item-name">\${escapeHtml(u.displayName || u.username)}</div>
+                        <div class="user-item-name">${escapeHtml(u.displayName || u.username)}</div>
                     </div>
                     <div class="user-item-check"></div>
                 </div>
-            \`;
+            `;
         });
     }
 
@@ -1434,13 +1727,13 @@
         selectedGroupMembers.forEach(id => {
             const u = users[id];
             if (u) {
-                container.innerHTML += \`
+                container.innerHTML += `
                     <div class="group-member-tag">
-                        <img src="\${escapeHtml(u.avatar)}">
-                        <span>\${escapeHtml(u.displayName || u.username)}</span>
-                        <button onclick="toggleGroupMember(\${id})">&times;</button>
+                        <img src="${escapeHtml(u.avatar)}">
+                        <span>${escapeHtml(u.displayName || u.username)}</span>
+                        <button onclick="toggleGroupMember(${id})">&times;</button>
                     </div>
-                \`;
+                `;
             }
         });
     }
@@ -1515,15 +1808,15 @@
         membersList.innerHTML = '';
         data.members.forEach(m => {
             const roleText = m.role === 'admin' ? 'Админ' : '';
-            membersList.innerHTML += \`
-                <div class="user-item" onclick="showUserProfile(\${m.id})">
-                    <img src="\${escapeHtml(m.avatar)}">
+            membersList.innerHTML += `
+                <div class="user-item" onclick="showUserProfile(${m.id})">
+                    <img src="${escapeHtml(m.avatar)}">
                     <div class="user-item-info">
-                        <div class="user-item-name">\${escapeHtml(m.displayName || m.username)}</div>
-                        <div class="user-item-status">\${roleText} \${m.online ? '● в сети' : ''}</div>
+                        <div class="user-item-name">${escapeHtml(m.displayName || m.username)}</div>
+                        <div class="user-item-status">${roleText} ${m.online ? '● в сети' : ''}</div>
                     </div>
                 </div>
-            \`;
+            `;
         });
 
         window.currentGroupId = groupId;
@@ -1750,16 +2043,16 @@
             const list = document.getElementById('sessionsList');
             list.innerHTML = data.sessions.map(s => {
                 const date = new Date(s.lastUsed).toLocaleString();
-                return \`
+                return `
                     <div class="settings-item" style="justify-content: space-between;">
                         <div>
-                            <div><strong>\${escapeHtml(s.device || 'Неизвестное устройство')}</strong></div>
-                            <small style="color:var(--text2)">IP: \${escapeHtml(s.ip)} • Последняя активность: \${date}</small>
+                            <div><strong>${escapeHtml(s.device || 'Неизвестное устройство')}</strong></div>
+                            <small style="color:var(--text2)">IP: ${escapeHtml(s.ip)} • Последняя активность: ${date}</small>
                         </div>
-                        \${s.current ? '<span style="color:var(--success)">Текущая сессия</span>' :
+                        ${s.current ? '<span style="color:var(--success)">Текущая сессия</span>' :
                         '<button class="btn btn-danger btn-sm" onclick="terminateSession(' + s.id + ')">Завершить</button>'}
                     </div>
-                \`;
+                `;
             }).join('');
         }
     }
@@ -1795,9 +2088,9 @@
         if (e.key === 'Escape') closeAllModals();
     };
 
+    // Init user search
     searchUsers('');
     searchUsersForGroup('');
-
     </script>
-    </body>
-    </html>
+</body>
+</html>
