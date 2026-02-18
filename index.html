@@ -1454,6 +1454,11 @@
             m.encryptedContent !== 'null' && m.encryptedKey !== 'null' && m.nonce !== 'null' && 
             privateKey) {
             try {
+                console.log('Decrypting message', m.id, {
+                    encLen: m.encryptedContent.length,
+                    keyLen: m.encryptedKey.length,
+                    nonceLen: m.nonce.length
+                });
                 messageText = await CryptoHelper.decryptMessage({
                     encryptedContent: m.encryptedContent,
                     encryptedKey: m.encryptedKey,
@@ -1464,8 +1469,10 @@
                 messageText = '🔒 [Ошибка расшифровки]';
             }
         } else if (m.content && m.content !== '') {
+            console.log('Plain text message', m.id, m.content);
             messageText = m.content;
         } else {
+            console.log('Empty message', m.id);
             messageText = '';
         }
         
