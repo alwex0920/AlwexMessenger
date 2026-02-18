@@ -1,67 +1,53 @@
+// api/index.js
 import { handleAuth } from './auth.js';
 import { handleMessages } from './messages.js';
 import { handleGroups } from './groups.js';
 import { handleUsers } from './users.js';
-import { json, corsHeaders } from '../lib/utils.js';
-import { initDB } from '../lib/db.js';
 
 export default async function handler(request) {
-  const { pathname } = new URL(request.url);
-
-  // CORS preflight
-  if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders
-    });
-  }
+  const url = new URL(request.url);
+  const path = url.pathname;
 
   try {
-    // Инициализация БД при первом запросе
-    await initDB();
-
-    // Роутинг
     // Авторизация
-    if (pathname.startsWith('/api/register') || 
-        pathname.startsWith('/api/login') || 
-        pathname.startsWith('/api/logout')) {
+    if (path === '/api/register' || path === '/api/login' || path === '/api/logout') {
       return await handleAuth(request);
     }
 
-    // Сообщения
-    if (pathname.startsWith('/api/messages') || 
-        pathname.startsWith('/api/chats')) {
+    // Сообщения и чаты
+    if (path === '/api/messages' || path === '/api/chats') {
       return await handleMessages(request);
     }
 
     // Группы
-    if (pathname.startsWith('/api/groups')) {
+    if (path.startsWith('/api/groups')) {
       return await handleGroups(request);
     }
 
     // Пользователи и профиль
-    if (pathname.startsWith('/api/users') || 
-        pathname.startsWith('/api/profile')) {
+    if (path === '/api/users' || path === '/api/profile') {
       return await handleUsers(request);
     }
 
-    // Ping endpoint
-    if (pathname === '/api/ping') {
-      return json({ 
-        success: true, 
-        timestamp: Date.now(),
-        version: '2.0.0'
+    // Ping
+    if (path === '/api/ping') {
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    // 404
-    return json({ error: 'Эндпоинт не найден' }, 404);
+    // Неизвестный путь
+    return new Response(JSON.stringify({ error: 'Not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
     console.error('API Error:', error);
-    return json({ 
-      error: 'Внутренняя ошибка сервера', 
-      details: error.message 
-    }, 500);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
