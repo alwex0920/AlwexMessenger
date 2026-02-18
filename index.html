@@ -933,7 +933,7 @@
     // ОСНОВНОЙ КОД ПРИЛОЖЕНИЯ (оригинальный с изменениями)
     // ============================================
 
-    const API = '';
+    const API = 'https://alwexmessenger.alwex.workers.dev';
     let token = localStorage.getItem('alwex_token');
     let user = JSON.parse(localStorage.getItem('alwex_user') || 'null');
     let privateKey = null;  // добавлено
@@ -1071,7 +1071,7 @@
             ws.close();
         }
         currentChatId = chatId;
-        const wsUrl = `wss://${window.location.host}/api/ws?chatId=${chatId}&userId=${user.id}&token=${token}`;
+        const wsUrl = `wss://alwexmessenger.alwex.workers.dev/api/ws?chatId=${chatId}&userId=${user.id}&token=${token}`;
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
