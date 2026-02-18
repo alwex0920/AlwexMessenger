@@ -1442,7 +1442,10 @@
         
         // Расшифровываем сообщение, если оно зашифровано
         let messageText = m.content;
-        if (m.encryptedContent && m.encryptedContent !== '' && m.encryptedKey && m.nonce && privateKey) {
+        if (m.encryptedContent && m.encryptedKey && m.nonce && 
+            m.encryptedContent !== '' && m.encryptedKey !== '' && m.nonce !== '' && 
+            m.encryptedContent !== 'null' && m.encryptedKey !== 'null' && m.nonce !== 'null' && 
+            privateKey) {
             try {
                 messageText = await CryptoHelper.decryptMessage({
                     encryptedContent: m.encryptedContent,
