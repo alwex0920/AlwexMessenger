@@ -890,7 +890,10 @@
         // Расшифровка сообщения
         async decryptMessage(encryptedData, privateKey) {
             try {
-                // Импортируем приватный ключ
+                console.log('Decrypting with private key length:', privateKey.length);
+                console.log('encryptedKey length:', encryptedData.encryptedKey.length);
+                console.log('nonce length:', encryptedData.nonce.length);
+                
                 const importedPrivateKey = await crypto.subtle.importKey(
                     'pkcs8',
                     this.base64ToArrayBuffer(privateKey),
@@ -898,15 +901,15 @@
                     false,
                     ['decrypt']
                 );
-                
-                // Расшифровываем симметричный ключ
+                console.log('Private key imported successfully');
+        
                 const decryptedKey = await crypto.subtle.decrypt(
                     { name: 'RSA-OAEP' },
                     importedPrivateKey,
                     this.base64ToArrayBuffer(encryptedData.encryptedKey)
                 );
-                
-                // Импортируем симметричный ключ
+                console.log('Symmetric key decrypted, length:', decryptedKey.byteLength);
+        
                 const symmetricKey = await crypto.subtle.importKey(
                     'raw',
                     decryptedKey,
@@ -914,8 +917,8 @@
                     false,
                     ['decrypt']
                 );
-                
-                // Расшифровываем сообщение
+                console.log('Symmetric key imported');
+        
                 const decryptedContent = await crypto.subtle.decrypt(
                     {
                         name: 'AES-GCM',
@@ -924,12 +927,12 @@
                     symmetricKey,
                     this.base64ToArrayBuffer(encryptedData.encryptedContent)
                 );
-                
-                const decoder = new TextDecoder();
-                return decoder.decode(decryptedContent);
+                console.log('Content decrypted successfully');
+        
+                return new TextDecoder().decode(decryptedContent);
             } catch (error) {
-                console.error('Decryption error:', error);
-                return '🔒 [Не удалось расшифровать]';
+                console.error('Detailed decryption error:', error);
+                return '🔒 [Ошибка расшифровки]';
             }
         },
         
@@ -1209,11 +1212,15 @@
     }
 
     async function ensureUserHasPublicKey(userId) {
-        if (users[userId]?.publicKey) return true;
+        if (users[userId]?.publicKey) {
+            console.log(`Public key for ${userId} already exists`);
+            return true;
+        }
         try {
             const data = await api('/api/users/' + userId);
             if (data.user && data.user.publicKey) {
                 users[userId] = { ...users[userId], ...data.user };
+                console.log(`Public key for ${userId} loaded from server`);
                 return true;
             }
         } catch (e) {
@@ -1575,36 +1582,6 @@
         renderMessages(data.messages || []);
         connectWebSocket(currentChatId, currentChatType);
     }
-
-    async function createGroup() {
-        const name = document.getElementById('groupName').value.trim();
-        const desc = document.getElementById('groupDesc').value.trim();
-        if (!name) { toast('Ошибка', 'Введите название группы', 'error'); return; }
-        if (selectedGroupMembers.length === 0) { toast('Ошибка', 'Добавьте хотя бы одного участника', 'error'); return; }
-    
-        // Генерируем общий ключ группы (32 байта)
-        const groupKeyRaw = crypto.getRandomValues(new Uint8Array(32));
-        const groupKeyBase64 = btoa(String.fromCharCode(...groupKeyRaw));
-    
-        // Собираем всех участников (включая себя)
-        const allMemberIds = [user.id, ...selectedGroupMembers];
-        const groupKeys = [];
-    
-        for (const memberId of allMemberIds) {
-            // Убедимся, что у нас есть публичный ключ участника
-            if (!users[memberId] || !users[memberId].publicKey) {
-                // Попробуем загрузить
-                await ensureUserHasPublicKey(memberId);
-            }
-            const member = users[memberId];
-            if (!member || !member.publicKey) {
-                const userName = member ? (member.username || memberId) : memberId;
-                toast('Ошибка', 'У пользователя ' + userName + ' нет публичного ключа', 'error');
-                return;
-            }
-            const encryptedKey = await CryptoHelper.encryptKeyForUser(groupKeyBase64, member.publicKey);
-            groupKeys.push({ userId: memberId, encryptedKey });
-        }
     
         const data = await api('/api/groups', {
             method: 'POST',
@@ -1629,6 +1606,37 @@
             groups[data.group.id].key = groupKeyBase64; // сохраняем ключ локально
             openGroupChat(data.group.id);
         }
+    }
+
+    async function openGroupChat(groupId) {
+        disconnectWebSocket();
+        currentChat = groups[groupId] || { id: groupId };
+        currentChatType = 'group';
+        currentChatId = 'group-' + groupId;
+        setupChatUI();
+        document.getElementById('chatName').textContent = currentChat.name || 'Группа';
+        document.getElementById('chatStatus').textContent = (currentChat.memberCount || 0) + ' участников';
+        document.getElementById('chatAvatar').src = currentChat.avatar || '';
+    
+        // Загружаем ключ группы, если ещё нет
+        if (!groups[groupId].key) {
+            const keyData = await api('/api/groups/' + groupId + '/key');
+            if (keyData.encryptedKey) {
+                try {
+                    const groupKey = await CryptoHelper.decryptGroupKey(keyData.encryptedKey, privateKey);
+                    groups[groupId].key = groupKey;
+                } catch (e) {
+                    console.error('Failed to decrypt group key', e);
+                    toast('Ошибка', 'Не удалось расшифровать ключ группы', 'error');
+                }
+            } else {
+                toast('Ошибка', 'Не удалось получить ключ группы', 'error');
+            }
+        }
+    
+        const data = await api('/api/messages?group=' + groupId);
+        renderMessages(data.messages || [], true);
+        connectWebSocket(currentChatId, currentChatType);
     }
 
     function setupChatUI() {
