@@ -755,11 +755,11 @@
             
             const publicKey = await crypto.subtle.exportKey('spki', keyPair.publicKey);
             const privateKey = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
-            
-            return {
-                publicKey: this.arrayBufferToBase64(publicKey),
-                privateKey: this.arrayBufferToBase64(privateKey)
-            };
+            const publicKeyB64 = this.arrayBufferToBase64(publicKey);
+            const privateKeyB64 = this.arrayBufferToBase64(privateKey);
+            console.log('Generated public key length:', publicKeyB64.length);
+            console.log('Generated private key length:', privateKeyB64.length);
+            return { publicKey: publicKeyB64, privateKey: privateKeyB64 };
         },
 
         // Шифрование короткой строки (ключа группы) публичным ключом пользователя
@@ -938,6 +938,7 @@
         
         // Сохранение ключей
         async saveKeys(publicKey, privateKey, password) {
+            console.log('saveKeys: publicKey length=', publicKey.length, 'privateKey length=', privateKey.length);
             const passwordKey = await this.deriveKeyFromPassword(password);
             const nonce = crypto.getRandomValues(new Uint8Array(12));
             
@@ -956,6 +957,8 @@
         async loadPrivateKey(password) {
             const encrypted = localStorage.getItem('alwex_private_key_encrypted');
             const nonce = localStorage.getItem('alwex_private_key_nonce');
+            console.log('loadPrivateKey: encrypted length=', encrypted ? encrypted.length : 'null');
+            console.log('loadPrivateKey: nonce length=', nonce ? nonce.length : 'null');
             
             if (!encrypted || !nonce) return null;
             
@@ -969,9 +972,11 @@
                 );
                 
                 const decoder = new TextDecoder();
-                return decoder.decode(decrypted);
+                const result = decoder.decode(decrypted);
+                console.log('loadPrivateKey: result length=', result.length);
+                return result;
             } catch (error) {
-                console.error('Failed to load private key:', error);
+                console.error('loadPrivateKey error:', error);
                 return null;
             }
         },
@@ -1421,11 +1426,11 @@
         // Загружаем приватный ключ
         privateKey = await CryptoHelper.loadPrivateKey(document.getElementById('loginPass').value);
 
+        console.log('privateKey after load:', privateKey);
         if (privateKey) {
+            console.log('privateKey length:', privateKey.length);
             sessionStorage.setItem('alwex_private_key', privateKey);
-        }
-        
-        if (!privateKey) {
+        } else {
             toast('Ошибка', 'Не удалось загрузить ключи шифрования', 'error');
         }
         
