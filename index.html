@@ -1577,35 +1577,10 @@
         document.getElementById('chatStatus').textContent = currentChat.online ? 'в сети' : 'был(а) недавно';
         document.getElementById('chatStatus').className = 'chat-head-status' + (currentChat.online ? ' online' : '');
         document.getElementById('chatAvatar').src = currentChat.avatar || '';
-
+    
         const data = await api('/api/messages?with=' + userId);
         renderMessages(data.messages || []);
         connectWebSocket(currentChatId, currentChatType);
-    }
-    
-        const data = await api('/api/groups', {
-            method: 'POST',
-            body: {
-                name,
-                description: desc,
-                members: selectedGroupMembers,
-                groupKeys
-            }
-        });
-    
-        if (data.error) { toast('Ошибка', data.error, 'error'); return; }
-        toast('Успешно!', 'Группа создана', 'success');
-        closeModal('createGroupModal');
-        document.getElementById('groupName').value = '';
-        document.getElementById('groupDesc').value = '';
-        selectedGroupMembers = [];
-        renderSelectedMembers();
-        await loadChats();
-        if (data.group) {
-            groups[data.group.id] = data.group;
-            groups[data.group.id].key = groupKeyBase64; // сохраняем ключ локально
-            openGroupChat(data.group.id);
-        }
     }
 
     async function openGroupChat(groupId) {
