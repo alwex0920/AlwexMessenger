@@ -1177,7 +1177,6 @@
     }
 
     // ===== Утилиты =====
-
     async function promptForPassword() {
         const password = prompt('Введите ваш пароль для расшифровки ключей:');
         if (password) {
@@ -1311,16 +1310,48 @@
         currentChatId = chatId;
         const wsUrl = `wss://alwexmessenger.alwex.workers.dev/api/ws?chatId=${chatId}&userId=${user.id}&token=${token}`;
         ws = new WebSocket(wsUrl);
-
+    
         ws.onopen = () => {
             console.log('WebSocket connected for', chatId);
         };
-
+    
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === 'message') {
                 addMessageToUI(data.message, currentChatType === 'group');
                 document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    
+                // ---------- УВЕДОМЛЕНИЯ ----------
+                // Показываем уведомление, если вкладка не активна и сообщение не от текущего пользователя
+                if (document.hidden && data.message.senderId !== user.id) {
+                    let title = '';
+                    let body = '';
+    
+                    if (currentChatType === 'group') {
+                        // Для группы: заголовок = название группы, тело = имя отправителя + текст
+                        title = currentChat?.name || 'Группа';
+                        body = `${data.message.senderName || 'Пользователь'}: `;
+                    } else {
+                        // Для личного чата: заголовок = имя отправителя
+                        title = data.message.senderName || 'Пользователь';
+                    }
+    
+                    // Добавляем содержимое сообщения
+                    if (data.message.type === 'image') {
+                        body += '📷 Изображение';
+                    } else {
+                        body += (data.message.content || 'Новое сообщение');
+                    }
+    
+                    // Показываем уведомление, если разрешено
+                    if (Notification.permission === 'granted') {
+                        new Notification(title, {
+                            body: body,
+                            icon: data.message.senderAvatar || '/favicon.ico' // путь к иконке по умолчанию
+                        });
+                    }
+                }
+                // ---------------------------------
             } else if (data.type === 'delete') {
                 const msgDiv = document.querySelector('.message[data-message-id=' + data.messageId + ']');
                 if (msgDiv) msgDiv.remove();
@@ -1330,7 +1361,7 @@
                 console.log('WebSocket ready');
             }
         };
-
+    
         ws.onclose = (event) => {
             console.log('WebSocket closed', event.code, event.reason);
             ws = null;
@@ -1340,7 +1371,7 @@
                 }, 3000);
             }
         };
-
+    
         ws.onerror = (err) => {
             console.error('WebSocket error:', err);
         };
@@ -1563,6 +1594,9 @@
         await loadChats();
         startPolling();
         toast('Добро пожаловать!', 'Привет, ' + (user.displayName || user.username) + '!', 'success');
+        if (Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
     }
 
     async function loadProfile() {
