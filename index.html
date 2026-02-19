@@ -721,6 +721,20 @@
         </div>
     </div>
 
+    <!-- Модалка добавления участника в группу -->
+    <div class="modal" id="addGroupMemberModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Добавить участника</h2>
+                <button class="icon-btn ripple" onclick="closeModal('addGroupMemberModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <div class="search" style="padding:0 0 12px"><input type="text" id="addMemberSearch" placeholder="Поиск пользователей..." oninput="searchUsersForAddMember(this.value)"></div>
+                <div id="addMemberUserList"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
     // ============================================
     // КРИПТОГРАФИЯ E2E - НОВЫЙ КОД
@@ -747,6 +761,81 @@
                 privateKey: this.arrayBufferToBase64(privateKey)
             };
         },
+
+        // Шифрование короткой строки (ключа группы) публичным ключом пользователя
+        async encryptKeyForUser(keyBase64, userPublicKey) {
+            const publicKey = await crypto.subtle.importKey(
+                'spki',
+                this.base64ToArrayBuffer(userPublicKey),
+                { name: 'RSA-OAEP', hash: 'SHA-256' },
+                false,
+                ['encrypt']
+            );
+            const encrypted = await crypto.subtle.encrypt(
+                { name: 'RSA-OAEP' },
+                publicKey,
+                new TextEncoder().encode(keyBase64)
+            );
+            return this.arrayBufferToBase64(encrypted);
+        },
+    
+        // Расшифровка ключа группы приватным ключом
+        async decryptGroupKey(encryptedKeyBase64, privateKey) {
+            const privateKeyObj = await crypto.subtle.importKey(
+                'pkcs8',
+                this.base64ToArrayBuffer(privateKey),
+                { name: 'RSA-OAEP', hash: 'SHA-256' },
+                false,
+                ['decrypt']
+            );
+            const decrypted = await crypto.subtle.decrypt(
+                { name: 'RSA-OAEP' },
+                privateKeyObj,
+                this.base64ToArrayBuffer(encryptedKeyBase64)
+            );
+            return new TextDecoder().decode(decrypted);
+        },
+    
+        // Симметричное шифрование сообщения с использованием готового ключа (AES-GCM)
+        async encryptMessageWithKey(message, keyBase64) {
+            const key = await crypto.subtle.importKey(
+                'raw',
+                Uint8Array.from(atob(keyBase64), c => c.charCodeAt(0)),
+                { name: 'AES-GCM' },
+                false,
+                ['encrypt']
+            );
+            const nonce = crypto.getRandomValues(new Uint8Array(12));
+            const encrypted = await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv: nonce },
+                key,
+                new TextEncoder().encode(message)
+            );
+            return {
+                encryptedContent: this.arrayBufferToBase64(encrypted),
+                nonce: this.arrayBufferToBase64(nonce)
+            };
+        },
+    
+        // Симметричная расшифровка
+        async decryptMessageWithKey(encryptedContentBase64, nonceBase64, keyBase64) {
+            const key = await crypto.subtle.importKey(
+                'raw',
+                Uint8Array.from(atob(keyBase64), c => c.charCodeAt(0)),
+                { name: 'AES-GCM' },
+                false,
+                ['decrypt']
+            );
+            const decrypted = await crypto.subtle.decrypt(
+                {
+                    name: 'AES-GCM',
+                    iv: this.base64ToArrayBuffer(nonceBase64)
+                },
+                key,
+                this.base64ToArrayBuffer(encryptedContentBase64)
+            );
+            return new TextDecoder().decode(decrypted);
+        }
         
         // Шифрование сообщения
         async encryptMessage(message, recipientPublicKey) {
@@ -949,6 +1038,80 @@
     let keepWarmInterval;
     let ws = null;
     let currentChatId = null;
+    let currentGroupForAdd = null;
+
+    function showAddMemberModal() {
+        currentGroupForAdd = window.currentGroupId; // сохраняем ID группы
+        document.getElementById('addMemberSearch').value = '';
+        searchUsersForAddMember('');
+        showModal('addGroupMemberModal');
+    }
+    
+    async function searchUsersForAddMember(search) {
+        const data = await api('/api/users?search=' + encodeURIComponent(search));
+        const list = document.getElementById('addMemberUserList');
+        list.innerHTML = '';
+        if (!data.users) return;
+    
+        // Фильтруем пользователей, исключая уже состоящих в группе
+        const filteredUsers = data.users.filter(u => !window.currentGroupMembers?.includes(u.id));
+    
+        if (filteredUsers.length === 0) {
+            list.innerHTML = '<p style="padding:20px;text-align:center;color:var(--text2)">Нет доступных пользователей</p>';
+            return;
+        }
+    
+        for (let i = 0; i < filteredUsers.length; i++) {
+            const u = filteredUsers[i];
+            list.innerHTML += '<div class="user-item" onclick="selectUserForAddMember(' + u.id + ')">' +
+                '<img src="' + escapeHtml(u.avatar) + '">' +
+                '<div class="user-item-info">' +
+                '<div class="user-item-name">' + escapeHtml(u.displayName || u.username) + '</div>' +
+                '</div>' +
+                '</div>';
+        }
+    }
+    
+    async function selectUserForAddMember(userId) {
+        closeModal('addGroupMemberModal');
+        await addMemberToGroup(currentGroupForAdd, userId);
+    }
+
+    async function addMemberToGroup(groupId, newUserId) {
+        const groupKey = groups[groupId]?.key;
+        if (!groupKey) {
+            toast('Ошибка', 'Ключ группы не найден', 'error');
+            return;
+        }
+        // Убедимся, что у нас есть публичный ключ нового пользователя
+        if (!users[newUserId]?.publicKey) {
+            await ensureUserHasPublicKey(newUserId);
+        }
+        const newUser = users[newUserId];
+        if (!newUser || !newUser.publicKey) {
+            toast('Ошибка', 'Нет публичного ключа у пользователя', 'error');
+            return;
+        }
+        try {
+            const encryptedKey = await CryptoHelper.encryptKeyForUser(groupKey, newUser.publicKey);
+            const data = await api('/api/groups/' + groupId + '/members', {
+                method: 'POST',
+                body: { userId: newUserId, encryptedKey }
+            });
+            if (data.error) {
+                toast('Ошибка', data.error, 'error');
+            } else {
+                toast('Успешно', 'Участник добавлен', 'success');
+                // Обновить информацию о группе (например, перезагрузить список участников)
+                if (window.currentGroupId === groupId) {
+                    showGroupInfo(groupId); // переоткрыть информацию
+                }
+            }
+        } catch (e) {
+            console.error('Add member error', e);
+            toast('Ошибка', 'Не удалось добавить участника', 'error');
+        }
+    }
 
     // ===== Keep Warm =====
     function startKeepWarm() {
@@ -1043,6 +1206,20 @@
             toast('Ошибка сети', 'Не удалось связаться с сервером', 'error');
             return { error: 'Network error' };
         }
+    }
+
+    async function ensureUserHasPublicKey(userId) {
+        if (users[userId]?.publicKey) return true;
+        try {
+            const data = await api('/api/users/' + userId);
+            if (data.user && data.user.publicKey) {
+                users[userId] = { ...users[userId], ...data.user };
+                return true;
+            }
+        } catch (e) {
+            console.error('Failed to load user data', e);
+        }
+        return false;
     }
 
     function toast(title, text, type = 'info') {
@@ -1387,6 +1564,7 @@
         currentChat = users[userId] || { id: userId };
         currentChatType = 'direct';
         currentChatId = 'direct-' + userId;
+        await ensureUserHasPublicKey(userId);
         setupChatUI();
         document.getElementById('chatName').textContent = currentChat.displayName || currentChat.username || 'User';
         document.getElementById('chatStatus').textContent = currentChat.online ? 'в сети' : 'был(а) недавно';
@@ -1398,20 +1576,59 @@
         connectWebSocket(currentChatId, currentChatType);
     }
 
-    async function openGroupChat(groupId) {
-        disconnectWebSocket();
-        currentChat = groups[groupId] || { id: groupId };
-        currentChatType = 'group';
-        currentChatId = 'group-' + groupId;
-        setupChatUI();
-        document.getElementById('chatName').textContent = currentChat.name || 'Группа';
-        document.getElementById('chatStatus').textContent = (currentChat.memberCount || 0) + ' участников';
-        document.getElementById('chatStatus').className = 'chat-head-status';
-        document.getElementById('chatAvatar').src = currentChat.avatar || '';
-
-        const data = await api('/api/messages?group=' + groupId);
-        renderMessages(data.messages || [], true);
-        connectWebSocket(currentChatId, currentChatType);
+    async function createGroup() {
+        const name = document.getElementById('groupName').value.trim();
+        const desc = document.getElementById('groupDesc').value.trim();
+        if (!name) { toast('Ошибка', 'Введите название группы', 'error'); return; }
+        if (selectedGroupMembers.length === 0) { toast('Ошибка', 'Добавьте хотя бы одного участника', 'error'); return; }
+    
+        // Генерируем общий ключ группы (32 байта)
+        const groupKeyRaw = crypto.getRandomValues(new Uint8Array(32));
+        const groupKeyBase64 = btoa(String.fromCharCode(...groupKeyRaw));
+    
+        // Собираем всех участников (включая себя)
+        const allMemberIds = [user.id, ...selectedGroupMembers];
+        const groupKeys = [];
+    
+        for (const memberId of allMemberIds) {
+            // Убедимся, что у нас есть публичный ключ участника
+            if (!users[memberId] || !users[memberId].publicKey) {
+                // Попробуем загрузить
+                await ensureUserHasPublicKey(memberId);
+            }
+            const member = users[memberId];
+            if (!member || !member.publicKey) {
+                const userName = member ? (member.username || memberId) : memberId;
+                toast('Ошибка', 'У пользователя ' + userName + ' нет публичного ключа', 'error');
+                return;
+            }
+            const encryptedKey = await CryptoHelper.encryptKeyForUser(groupKeyBase64, member.publicKey);
+            groupKeys.push({ userId: memberId, encryptedKey });
+        }
+    
+        const data = await api('/api/groups', {
+            method: 'POST',
+            body: {
+                name,
+                description: desc,
+                members: selectedGroupMembers,
+                groupKeys
+            }
+        });
+    
+        if (data.error) { toast('Ошибка', data.error, 'error'); return; }
+        toast('Успешно!', 'Группа создана', 'success');
+        closeModal('createGroupModal');
+        document.getElementById('groupName').value = '';
+        document.getElementById('groupDesc').value = '';
+        selectedGroupMembers = [];
+        renderSelectedMembers();
+        await loadChats();
+        if (data.group) {
+            groups[data.group.id] = data.group;
+            groups[data.group.id].key = groupKeyBase64; // сохраняем ключ локально
+            openGroupChat(data.group.id);
+        }
     }
 
     function setupChatUI() {
@@ -1449,24 +1666,38 @@
         
         // Расшифровываем сообщение, если оно зашифровано
         let messageText = m.content;
-        if (m.encryptedContent && m.encryptedKey && m.nonce && 
-            m.encryptedContent !== '' && m.encryptedKey !== '' && m.nonce !== '' && 
-            m.encryptedContent !== 'null' && m.encryptedKey !== 'null' && m.nonce !== 'null' && 
+        console.log('Message data:', { id: m.id, encryptedContent: m.encryptedContent, encryptedKey: m.encryptedKey, nonce: m.nonce, content: m.content });
+
+        if (m.encryptedContent && m.nonce && 
+            m.encryptedContent !== '' && m.nonce !== '' && 
+            m.encryptedContent !== 'null' && m.nonce !== 'null' && 
             privateKey) {
-            try {
-                console.log('Decrypting message', m.id, {
-                    encLen: m.encryptedContent.length,
-                    keyLen: m.encryptedKey.length,
-                    nonceLen: m.nonce.length
-                });
-                messageText = await CryptoHelper.decryptMessage({
-                    encryptedContent: m.encryptedContent,
-                    encryptedKey: m.encryptedKey,
-                    nonce: m.nonce
-                }, privateKey);
-            } catch (e) {
-                console.error('Decryption error for message', m.id, e);
-                messageText = '🔒 [Ошибка расшифровки]';
+            
+            if (currentChatType === 'group') {
+                // Групповое сообщение
+                const groupKey = groups[currentChat.id]?.key;
+                if (groupKey) {
+                    try {
+                        messageText = await CryptoHelper.decryptMessageWithKey(m.encryptedContent, m.nonce, groupKey);
+                    } catch (e) {
+                        console.error('Group message decryption error', e);
+                        messageText = '🔒 [Ошибка расшифровки]';
+                    }
+                } else {
+                    messageText = '🔒 [Ключ группы недоступен]';
+                }
+            } else {
+                // Личное сообщение
+                try {
+                    messageText = await CryptoHelper.decryptMessage({
+                        encryptedContent: m.encryptedContent,
+                        encryptedKey: m.encryptedKey,
+                        nonce: m.nonce
+                    }, privateKey);
+                } catch (e) {
+                    console.error('Decryption error for message', m.id, e);
+                    messageText = '🔒 [Ошибка расшифровки]';
+                }
             }
         } else if (m.content && m.content !== '') {
             console.log('Plain text message', m.id, m.content);
@@ -1533,29 +1764,25 @@
     async function sendMsg() {
         const input = document.getElementById('msgInput');
         const content = input.value.trim();
-
         if (!content && !pendingImage) return;
         if (!currentChat) return;
-
+    
         const msgId = crypto.randomUUID();
-
         const body = { clientMessageId: msgId };
+    
         if (currentChatType === 'direct') {
             body.recipientId = currentChat.id;
         } else {
             body.groupId = currentChat.id;
         }
-
-        // Если есть изображение, отправляем как есть (не шифруем)
+    
         if (pendingImage) {
             body.type = 'image';
             body.mediaData = pendingImage;
             body.content = '';
         } else {
             body.type = 'text';
-            // Шифруем текст
             if (currentChatType === 'direct') {
-                // Получаем публичный ключ собеседника
                 const recipientPublicKey = users[currentChat.id]?.publicKey;
                 if (recipientPublicKey && privateKey) {
                     try {
@@ -1563,26 +1790,38 @@
                         body.encryptedContent = encrypted.encryptedContent;
                         body.encryptedKey = encrypted.encryptedKey;
                         body.nonce = encrypted.nonce;
-                        body.content = ''; // не отправляем открытый текст
+                        body.content = ''; // очищаем открытый текст
                     } catch (e) {
                         toast('Ошибка шифрования', 'Не удалось зашифровать сообщение', 'error');
                         return;
                     }
                 } else {
-                    // Если нет ключа, отправляем открытым текстом (для совместимости)
                     body.content = content;
                 }
-            } else {
-                // Для группы пока отправляем открытым текстом (позже можно реализовать шифрование для каждого участника)
-                body.content = content;
+            } else if (currentChatType === 'group') {
+                const groupKey = groups[currentChat.id]?.key;
+                if (groupKey && privateKey) {
+                    try {
+                        const encrypted = await CryptoHelper.encryptMessageWithKey(content, groupKey);
+                        body.encryptedContent = encrypted.encryptedContent;
+                        body.nonce = encrypted.nonce;
+                        // для групп encryptedKey не нужен
+                        body.content = '';
+                    } catch (e) {
+                        toast('Ошибка шифрования', 'Не удалось зашифровать сообщение', 'error');
+                        return;
+                    }
+                } else {
+                    body.content = content; // fallback (не рекомендуется)
+                }
             }
         }
-
+    
         input.value = '';
         input.style.height = 'auto';
-
+    
         if (ws && ws.readyState === WebSocket.OPEN) {
-            // Создаём локальное сообщение (для отображения)
+            // Локальное отображение (для оптимистичного UI)
             const localMessage = {
                 id: msgId,
                 senderId: user.id,
@@ -1593,7 +1832,7 @@
             };
             addMessageToUI(localMessage, currentChatType === 'group');
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-
+    
             ws.send(JSON.stringify({
                 type: 'message',
                 clientMessageId: msgId,
@@ -1605,10 +1844,9 @@
                 nonce: body.nonce,
                 mediaData: pendingImage
             }));
-
+    
             clearImagePreview();
         } else {
-            console.log('WebSocket not open, using HTTP');
             const data = await api('/api/messages', { method: 'POST', body });
             if (data.message) {
                 addMessageToUI({ ...data.message, senderId: user.id }, currentChatType === 'group');
@@ -1772,29 +2010,43 @@
     async function createGroup() {
         const name = document.getElementById('groupName').value.trim();
         const desc = document.getElementById('groupDesc').value.trim();
-
-        if (!name) {
-            toast('Ошибка', 'Введите название группы', 'error');
-            return;
+        if (!name) { toast('Ошибка', 'Введите название группы', 'error'); return; }
+        if (selectedGroupMembers.length === 0) { toast('Ошибка', 'Добавьте хотя бы одного участника', 'error'); return; }
+    
+        // Генерируем общий ключ группы (32 байта)
+        const groupKeyRaw = crypto.getRandomValues(new Uint8Array(32));
+        const groupKeyBase64 = btoa(String.fromCharCode(...groupKeyRaw));
+    
+        // Собираем всех участников (включая себя)
+        const allMemberIds = [user.id, ...selectedGroupMembers];
+        const groupKeys = [];
+    
+        for (const memberId of allMemberIds) {
+            // Убедимся, что у нас есть публичный ключ участника
+            if (!users[memberId] || !users[memberId].publicKey) {
+                // Попробуем загрузить
+                await ensureUserHasPublicKey(memberId);
+            }
+            const member = users[memberId];
+            if (!member || !member.publicKey) {
+                toast('Ошибка', `У пользователя ${member?.username || memberId} нет публичного ключа`, 'error');
+                return;
+            }
+            const encryptedKey = await CryptoHelper.encryptKeyForUser(groupKeyBase64, member.publicKey);
+            groupKeys.push({ userId: memberId, encryptedKey });
         }
-        if (selectedGroupMembers.length === 0) {
-            toast('Ошибка', 'Добавьте хотя бы одного участника', 'error');
-            return;
-        }
-
+    
         const data = await api('/api/groups', {
-            method: 'POST', body: {
+            method: 'POST',
+            body: {
                 name,
                 description: desc,
-                members: selectedGroupMembers
+                members: selectedGroupMembers,
+                groupKeys
             }
         });
-
-        if (data.error) {
-            toast('Ошибка', data.error, 'error');
-            return;
-        }
-
+    
+        if (data.error) { toast('Ошибка', data.error, 'error'); return; }
         toast('Успешно!', 'Группа создана', 'success');
         closeModal('createGroupModal');
         document.getElementById('groupName').value = '';
@@ -1804,6 +2056,7 @@
         await loadChats();
         if (data.group) {
             groups[data.group.id] = data.group;
+            groups[data.group.id].key = groupKeyBase64; // сохраняем ключ локально
             openGroupChat(data.group.id);
         }
     }
