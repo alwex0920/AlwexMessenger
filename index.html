@@ -1152,11 +1152,13 @@
     if (token && user) {
         // Восстанавливаем приватный ключ из sessionStorage
         const savedKey = sessionStorage.getItem('alwex_private_key');
-        if (savedKey) {
+        if (savedKey && savedKey.length > 100) { // проверяем, что это похоже на реальный ключ
             privateKey = savedKey;
-            console.log('Private key restored from sessionStorage');
+            console.log('Private key restored from sessionStorage, length:', privateKey.length);
         } else {
-            console.warn('Приватный ключ не найден в sessionStorage');
+            console.warn('Invalid private key in sessionStorage, clearing it');
+            sessionStorage.removeItem('alwex_private_key');
+            privateKey = null;
         }
         startKeepWarm();
         showApp();
@@ -1400,15 +1402,15 @@
         const btn = document.getElementById('loginBtn');
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner"></span>';
-
+    
         const body = { username: document.getElementById('loginUser').value, password: document.getElementById('loginPass').value };
         const tfaCode = document.getElementById('tfaCode').value;
         if (tfaCode) body.twoFactorCode = tfaCode;
-
+    
         const data = await api('/api/login', { method: 'POST', body });
         btn.disabled = false;
         btn.innerHTML = '<span>Войти</span>';
-
+    
         if (data.twoFactorRequired) {
             document.getElementById('tfaField').style.display = 'block';
             document.getElementById('tfaCode').focus();
@@ -1422,21 +1424,23 @@
         }
         token = data.token;
         user = data.user;
-        
+    
         // Загружаем приватный ключ
         privateKey = await CryptoHelper.loadPrivateKey(document.getElementById('loginPass').value);
-
+    
         console.log('privateKey after load:', privateKey);
         if (privateKey) {
             console.log('privateKey length:', privateKey.length);
             sessionStorage.setItem('alwex_private_key', privateKey);
+            // Проверим, что записалось
+            console.log('sessionStorage after set:', sessionStorage.getItem('alwex_private_key') ? 'OK' : 'FAIL');
         } else {
             toast('Ошибка', 'Не удалось загрузить ключи шифрования', 'error');
         }
-        
+    
         localStorage.setItem('alwex_token', token);
         localStorage.setItem('alwex_user', JSON.stringify(user));
-        sessionStorage.setItem('alwex_private_key', privateKey);
+        // sessionStorage уже установлен выше
         showApp();
     };
 
