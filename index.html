@@ -835,7 +835,7 @@
                 this.base64ToArrayBuffer(encryptedContentBase64)
             );
             return new TextDecoder().decode(decrypted);
-        }
+        },
         
         // Шифрование сообщения
         async encryptMessage(message, recipientPublicKey) {
