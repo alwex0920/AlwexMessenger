@@ -939,19 +939,30 @@
         // Сохранение ключей
         async saveKeys(publicKey, privateKey, password) {
             console.log('saveKeys: publicKey length=', publicKey.length, 'privateKey length=', privateKey.length);
-            const passwordKey = await this.deriveKeyFromPassword(password);
-            const nonce = crypto.getRandomValues(new Uint8Array(12));
-            
-            const encoder = new TextEncoder();
-            const encryptedPrivateKey = await crypto.subtle.encrypt(
-                { name: 'AES-GCM', iv: nonce },
-                passwordKey,
-                encoder.encode(privateKey)
-            );
-            
-            localStorage.setItem('alwex_public_key', publicKey);
-            localStorage.setItem('alwex_private_key_encrypted', this.arrayBufferToBase64(encryptedPrivateKey));
-            localStorage.setItem('alwex_private_key_nonce', this.arrayBufferToBase64(nonce));
+            try {
+                const passwordKey = await this.deriveKeyFromPassword(password);
+                console.log('passwordKey derived');
+                const nonce = crypto.getRandomValues(new Uint8Array(12));
+                const encoder = new TextEncoder();
+                const privateKeyBuffer = encoder.encode(privateKey);
+                console.log('privateKeyBuffer length:', privateKeyBuffer.length);
+                const encryptedPrivateKey = await crypto.subtle.encrypt(
+                    { name: 'AES-GCM', iv: nonce },
+                    passwordKey,
+                    privateKeyBuffer
+                );
+                console.log('encryptedPrivateKey generated, length:', encryptedPrivateKey.byteLength);
+        
+                localStorage.setItem('alwex_public_key', publicKey);
+                localStorage.setItem('alwex_private_key_encrypted', this.arrayBufferToBase64(encryptedPrivateKey));
+                localStorage.setItem('alwex_private_key_nonce', this.arrayBufferToBase64(nonce));
+        
+                console.log('saveKeys: keys saved successfully');
+                console.log('stored encrypted length:', localStorage.getItem('alwex_private_key_encrypted').length);
+            } catch (error) {
+                console.error('saveKeys error:', error);
+                throw new Error('Не удалось сохранить ключи шифрования');
+            }
         },
         
         async loadPrivateKey(password) {
@@ -1352,9 +1363,19 @@
         
         // Генерируем ключевую пару
         const keys = await CryptoHelper.generateKeyPair();
-        
+
         // Сохраняем ключи локально
-        await CryptoHelper.saveKeys(keys.publicKey, keys.privateKey, document.getElementById('regPass').value);
+        try {
+            await CryptoHelper.saveKeys(keys.publicKey, keys.privateKey, document.getElementById('regPass').value);
+        } catch (e) {
+            console.error('Ошибка сохранения ключей:', e);
+            document.getElementById('authError').textContent = 'Ошибка сохранения ключей: ' + e.message;
+            document.getElementById('authError').classList.add('show');
+            btn.disabled = false;
+            btn.innerHTML = '<span>Создать аккаунт</span>';
+            return;
+        }
+
         
         const data = await api('/api/register', {
             method: 'POST', body: {
