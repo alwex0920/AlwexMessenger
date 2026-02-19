@@ -1402,6 +1402,7 @@
         
         localStorage.setItem('alwex_token', token);
         localStorage.setItem('alwex_user', JSON.stringify(user));
+        sessionStorage.setItem('alwex_private_key', privateKey);
         
         if (data.verificationRequired) {
             document.getElementById('authSuccess').innerHTML = 'Код подтверждения: <strong>' + data._demoCode + '</strong>';
