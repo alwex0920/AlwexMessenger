@@ -619,6 +619,9 @@
                         <option value="other">Другое</option>
                     </select>
                 </div>
+                <div style="text-align:center; margin:16px 0;">
+                    <button class="btn btn-secondary btn-sm" onclick="exportKey()">📤 Экспортировать ключ (QR)</button>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary btn-sm" onclick="closeModal('profileModal')">Отмена</button>
@@ -782,9 +785,6 @@
                 <div id="qrcode" style="margin:20px auto; width:256px; height:256px; background:#fff; padding:10px; border-radius:10px;"></div>
                 <p style="font-size:12px; color:var(--text2); word-break:break-all; background:var(--bg3); padding:10px; border-radius:8px;" id="exportKeyString"></p>
                 <button class="btn btn-secondary btn-sm" onclick="copyExportKey()">Копировать строку</button>
-            </div>
-            <div style="text-align:center; margin:16px 0;">
-                <button class="btn btn-secondary btn-sm" onclick="exportKey()">📤 Экспортировать ключ (QR)</button>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-primary btn-sm" onclick="closeModal('exportKeyModal')">Закрыть</button>
