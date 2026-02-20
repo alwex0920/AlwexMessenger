@@ -322,6 +322,8 @@
             fill: var(--success);
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
 </head>
 <body>
     <div class="toast-box" id="toasts"></div>
@@ -376,6 +378,9 @@
                     <input type="text" id="tfaCode" maxlength="6" inputmode="numeric" placeholder="123456">
                 </div>
                 <button type="submit" class="btn btn-primary ripple" id="loginBtn"><span>Войти</span></button>
+                <div style="text-align:center; margin-top:12px;">
+                    <button type="button" class="btn-text" onclick="showModal('importKeyModal')">🔑 Импортировать ключ с другого устройства</button>
+                </div>
             </form>
 
             <form class="form" id="registerForm" data-form="register">
@@ -765,6 +770,68 @@
         </div>
     </div>
 
+    <!-- Модалка экспорта ключа (QR) -->
+    <div class="modal" id="exportKeyModal">
+        <div class="modal-box" style="max-width: 400px;">
+            <div class="modal-head">
+                <h2>Экспорт ключа шифрования</h2>
+                <button class="icon-btn ripple" onclick="closeModal('exportKeyModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <p style="margin-bottom:16px">Отсканируйте этот QR-код на другом устройстве, чтобы импортировать ключ.</p>
+                <div id="qrcode" style="margin:20px auto; width:256px; height:256px; background:#fff; padding:10px; border-radius:10px;"></div>
+                <p style="font-size:12px; color:var(--text2); word-break:break-all; background:var(--bg3); padding:10px; border-radius:8px;" id="exportKeyString"></p>
+                <button class="btn btn-secondary btn-sm" onclick="copyExportKey()">Копировать строку</button>
+            </div>
+            <div style="text-align:center; margin:16px 0;">
+                <button class="btn btn-secondary btn-sm" onclick="exportKey()">📤 Экспортировать ключ (QR)</button>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary btn-sm" onclick="closeModal('exportKeyModal')">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка импорта ключа (при входе) -->
+    <div class="modal" id="importKeyModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Импорт ключа с другого устройства</h2>
+                <button class="icon-btn ripple" onclick="closeModal('importKeyModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:16px">Вставьте скопированную строку ключа или отсканируйте QR-код.</p>
+                <div class="field">
+                    <label>Строка ключа</label>
+                    <textarea id="importKeyString" rows="3" placeholder="alwex_key:v1:..."></textarea>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 16px;">
+                    <button class="btn btn-primary btn-sm" style="flex:1;" onclick="importKey()">Импортировать</button>
+                    <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="showModal('scanQRModal'); setTimeout(startQRScanner, 500);">📷 Сканировать QR</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Модалка сканирования QR-кода -->
+    <div class="modal" id="scanQRModal">
+        <div class="modal-box" style="max-width: 500px;">
+            <div class="modal-head">
+                <h2>Сканировать QR-код</h2>
+                <button class="icon-btn ripple" onclick="stopQRScanner(); closeModal('scanQRModal')">
+                    <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </div>
+            <div class="modal-body" style="text-align:center; min-height: 300px;">
+                <div id="qrScannerContainer" style="position: relative; width: 100%;">
+                    <video id="qrVideo" style="width: 100%; max-width: 400px; border-radius: 10px;"></video>
+                    <div id="qrScannerStatus" style="margin-top: 16px;">Подготовка камеры...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-sm" onclick="stopQRScanner(); closeModal('scanQRModal')">Отмена</button>
+            </div>
+        </div>
+    </div>
     <script>
     // ============================================
     // КРИПТОГРАФИЯ E2E - НОВЫЙ КОД
@@ -1088,6 +1155,83 @@
     let ws = null;
     let currentChatId = null;
     let currentGroupForAdd = null;
+    let qrScanner = null;
+
+    async function startQRScanner() {
+        // Проверяем поддержку
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            toast('Ошибка', 'Ваш браузер не поддерживает доступ к камере', 'error');
+            return;
+        }
+    
+        const video = document.getElementById('qrVideo');
+        if (!video) return;
+    
+        // Запрашиваем разрешение (если ещё не дано)
+        const hasPermission = await requestCameraPermission();
+        if (!hasPermission) {
+            toast('Ошибка', 'Не удалось получить доступ к камере', 'error');
+            document.getElementById('qrScannerStatus').textContent = 'Доступ к камере запрещён';
+            return;
+        }
+    
+        document.getElementById('qrScannerStatus').textContent = 'Запуск камеры...';
+    
+        try {
+            // Создаём экземпляр сканера
+            qrScanner = new QrScanner(
+                video,
+                (result) => {
+                    // Успешно распознали QR
+                    console.log('QR detected:', result);
+                    
+                    // Останавливаем сканирование
+                    stopQRScanner();
+                    
+                    // Закрываем модалку
+                    closeModal('scanQRModal');
+                    
+                    // Обрабатываем результат
+                    handleScannedQR(result.data || result);
+                },
+                {
+                    highlightScanRegion: true,
+                    highlightCodeOutline: true,
+                    preferredCamera: 'environment' // задняя камера
+                }
+            );
+    
+            await qrScanner.start();
+            document.getElementById('qrScannerStatus').textContent = 'Сканирование... Наведите на QR-код';
+        } catch (error) {
+            console.error('QR Scanner error:', error);
+            document.getElementById('qrScannerStatus').textContent = 'Ошибка запуска камеры';
+            toast('Ошибка', 'Не удалось запустить камеру: ' + error.message, 'error');
+        }
+    }
+    
+    function stopQRScanner() {
+        if (qrScanner) {
+            qrScanner.stop();
+            qrScanner.destroy();
+            qrScanner = null;
+        }
+    }
+    
+    function handleScannedQR(data) {
+        console.log('Scanned QR data:', data);
+        
+        // Проверяем, что это наш формат ключа
+        if (data.startsWith('alwex_key:v1:')) {
+            // Вставляем в поле импорта
+            document.getElementById('importKeyString').value = data;
+            // Показываем модалку импорта (если не открыта)
+            showModal('importKeyModal');
+            toast('Успешно', 'QR-код распознан! Нажмите "Импортировать"', 'success');
+        } else {
+            toast('Ошибка', 'Это не ключ AlwexMessenger', 'error');
+        }
+    }
 
     function showAddMemberModal() {
         currentGroupForAdd = window.currentGroupId; // сохраняем ID группы
@@ -1162,6 +1306,89 @@
         }
     }
 
+    // ===== Экспорт/импорт ключа через QR =====
+    function exportKey() {
+        const encrypted = localStorage.getItem('alwex_private_key_encrypted');
+        const nonce = localStorage.getItem('alwex_private_key_nonce');
+        if (!encrypted || !nonce) {
+            toast('Ошибка', 'Нет ключа для экспорта', 'error');
+            return;
+        }
+        const keyString = `alwex_key:v1:${encrypted}:${nonce}`;
+        document.getElementById('exportKeyString').textContent = keyString;
+    
+        const qr = qrcode(0, 'M');
+        qr.addData(keyString);
+        qr.make();
+        document.getElementById('qrcode').innerHTML = qr.createImgTag(5, 0);
+    
+        showModal('exportKeyModal');
+    }
+    
+    function copyExportKey() {
+        const text = document.getElementById('exportKeyString').textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            toast('Скопировано', 'Строка ключа скопирована в буфер', 'success');
+        }).catch(() => {
+            toast('Ошибка', 'Не удалось скопировать', 'error');
+        });
+    }
+    
+    async function importKey() {
+        const keyString = document.getElementById('importKeyString').value.trim();
+        if (!keyString) {
+            toast('Ошибка', 'Введите строку ключа', 'error');
+            return;
+        }
+    
+        const parts = keyString.split(':');
+        if (parts.length !== 4 || parts[0] !== 'alwex_key' || parts[1] !== 'v1') {
+            toast('Ошибка', 'Неверный формат ключа', 'error');
+            return;
+        }
+        const encrypted = parts[2];
+        const nonce = parts[3];
+    
+        const password = document.getElementById('loginPass').value;
+        if (!password) {
+            toast('Ошибка', 'Сначала введите пароль в форме входа', 'error');
+            return;
+        }
+    
+        try {
+            const passwordKey = await CryptoHelper.deriveKeyFromPassword(password);
+            await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: CryptoHelper.base64ToArrayBuffer(nonce) },
+                passwordKey,
+                CryptoHelper.base64ToArrayBuffer(encrypted)
+            );
+        } catch (e) {
+            toast('Ошибка', 'Не удалось расшифровать ключ – возможно, неверный пароль или ключ повреждён', 'error');
+            return;
+        }
+    
+        localStorage.setItem('alwex_private_key_encrypted', encrypted);
+        localStorage.setItem('alwex_private_key_nonce', nonce);
+    
+        toast('Успешно', 'Ключ импортирован. Теперь вы можете войти.', 'success');
+        closeModal('importKeyModal');
+        document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+    }
+
+    async function requestCameraPermission() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" } // предпочитаем заднюю камеру
+            });
+            // Сразу останавливаем треки, нам нужно только разрешение
+            stream.getTracks().forEach(track => track.stop());
+            return true;
+        } catch (err) {
+            console.error('Camera permission error:', err);
+            return false;
+        }
+    }
+        
     // ===== Keep Warm =====
     function startKeepWarm() {
         if (keepWarmInterval) clearInterval(keepWarmInterval);
@@ -1329,7 +1556,12 @@
     }
 
     function showModal(id) { closeAllModals(); document.getElementById(id).classList.add('show'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('show');
+        if (id === 'scanQRModal') {
+            stopQRScanner();
+        }
+    }
     function closeAllModals() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('show')); }
 
     // ===== WebSocket =====
