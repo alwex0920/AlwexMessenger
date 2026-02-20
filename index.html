@@ -37,7 +37,7 @@
             border-radius: 20px; /* если хотите скругление */
         }
         
-        .logo-icon img {
+        .logo-image {
             width: 100%;
             height: 100%;
             object-fit: contain; /* или cover, если нужно заполнить */
@@ -1597,8 +1597,6 @@
         localStorage.removeItem('alwex_token');
         localStorage.removeItem('alwex_user');
         localStorage.removeItem('alwex_public_key');
-        localStorage.removeItem('alwex_private_key_encrypted');
-        localStorage.removeItem('alwex_private_key_nonce');
         sessionStorage.removeItem('alwex_private_key');
         location.reload();
     }
