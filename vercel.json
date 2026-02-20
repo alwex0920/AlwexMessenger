@@ -4,16 +4,12 @@
     {
       "src": "index.html",
       "use": "@vercel/static"
-    },
-    {
-      "src": "api/proxy.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/proxy"
+      "dest": "https://alwexmessenger.alwex.workers.dev/api/$1"
     },
     {
       "src": "/(.*)",
