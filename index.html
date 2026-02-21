@@ -346,9 +346,9 @@
             }
         }
         #userProfileBio {
-            display: block !important;
-            border: 1px solid red;
-            color: white;
+            color: var(--text);
+            word-break: break-word;
+            margin: 0;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
@@ -782,7 +782,10 @@
                     <div class="profile-name" id="userProfileName"></div>
                     <div class="profile-username" id="userProfileUsername"></div>
                 </div>
-                <p style="text-align:center;color:var(--text2);padding:20px" id="userProfileBio"></p>
+                <div style="text-align:center; padding:20px;">
+                    <div style="color:var(--text2); margin-bottom:8px; font-weight:600;">📝 Описание</div>
+                    <p id="userProfileBio" style="color:var(--text); word-break:break-word; margin:0;"></p>
+                </div>
                 <button class="btn btn-primary" onclick="startChatWithUser()" id="startChatBtn">Написать сообщение</button>
             </div>
         </div>
