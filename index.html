@@ -609,6 +609,16 @@
                         </div>
                         <div class="toggle" id="tfaToggle"></div>
                     </div>
+                    <div class="settings-item" onclick="rotateKeys()">
+                        <div class="settings-label">
+                            <svg viewBox="0 0 24 24"><path d="M19 8h-1V6c0-2.76-2.24-5-5-5S8 3.24 8 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                            <span>Обновить ключи шифрования</span>
+                        </div>
+                        <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:var(--text2)"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+                    </div>
+                    <div style="padding: 8px 16px; font-size:12px; color:var(--warning);">
+                        ⚠️ После обновления старые сообщения станут недоступны.
+                    </div>
                 </div>
                 <div class="danger-zone">
                     <h4>⚠️ Опасная зона</h4>
@@ -861,6 +871,15 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary btn-sm" onclick="stopQRScanner(); closeModal('scanQRModal')">Отмена</button>
+            </div>
+        </div>
+    </div>
+    <!-- Индикатор загрузки для ротации ключей -->
+    <div class="modal" id="loadingModal" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-box" style="max-width: 300px; text-align: center;">
+            <div class="modal-body">
+                <div class="spinner" style="margin: 20px auto;"></div>
+                <p id="loadingMessage">Обновление ключей...</p>
             </div>
         </div>
     </div>
@@ -1265,6 +1284,15 @@
         }
     }
 
+    function showLoading(message = 'Обновление ключей...') {
+        document.getElementById('loadingMessage').textContent = message;
+        document.getElementById('loadingModal').classList.add('show');
+    }
+    
+    function hideLoading() {
+        document.getElementById('loadingModal').classList.remove('show');
+    }
+
     function showAddMemberModal() {
         currentGroupForAdd = window.currentGroupId; // сохраняем ID группы
         document.getElementById('addMemberSearch').value = '';
@@ -1335,6 +1363,56 @@
         } catch (e) {
             console.error('Add member error', e);
             toast('Ошибка', 'Не удалось добавить участника', 'error');
+        }
+    }
+
+    async function rotateKeys() {
+        if (!confirm('Вы уверены, что хотите обновить ключи шифрования?\n\nПосле этого все старые сообщения станут нечитаемыми. Это действие необратимо.\n\nЕсли ваш аккаунт был скомпрометирован, новый ключ защитит ваши будущие сообщения.')) {
+            return;
+        }
+    
+        const password = prompt('Введите ваш пароль для подтверждения:');
+        if (!password) return;
+    
+        // Проверяем пароль, загружая текущий приватный ключ
+        showLoading('Проверка пароля...');
+        const currentPrivateKey = await CryptoHelper.loadPrivateKey(password);
+        if (!currentPrivateKey) {
+            hideLoading();
+            toast('Ошибка', 'Неверный пароль или ключи повреждены', 'error');
+            return;
+        }
+    
+        showLoading('Генерация нового ключа...');
+        try {
+            const keys = await CryptoHelper.generateKeyPair();
+    
+            showLoading('Отправка ключа на сервер...');
+            const data = await api('/api/user/rotate-keys', {
+                method: 'POST',
+                body: { publicKey: keys.publicKey }
+            });
+    
+            if (data.error) {
+                hideLoading();
+                toast('Ошибка', data.error, 'error');
+                return;
+            }
+    
+            showLoading('Сохранение ключа...');
+            await CryptoHelper.saveKeys(keys.publicKey, keys.privateKey, password);
+    
+            // Обновляем глобальные переменные и sessionStorage
+            privateKey = keys.privateKey;
+            sessionStorage.setItem('alwex_private_key', privateKey);
+    
+            hideLoading();
+            toast('Успешно', 'Ключи обновлены! Страница будет перезагружена.', 'success');
+            setTimeout(() => location.reload(), 2000);
+        } catch (error) {
+            hideLoading();
+            console.error('Key rotation error:', error);
+            toast('Ошибка', 'Не удалось обновить ключи: ' + error.message, 'error');
         }
     }
 
