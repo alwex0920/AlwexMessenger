@@ -2245,7 +2245,7 @@
                     }
                     messageText = await CryptoHelper.decryptMessage({
                         encryptedContent: m.encryptedContent,
-                        encryptedKey: m.encryptedKey,
+                        encryptedKey: keyToUse,
                         nonce: m.nonce
                     }, privateKey);
                 } catch (e) {
