@@ -2147,12 +2147,15 @@
         document.getElementById('chatStatus').textContent = data.group.description || '';
         document.getElementById('chatAvatar').src = data.group.avatar;
     
-        // Определяем, может ли пользователь писать (админ)
         const member = data.members.find(m => m.id === user.id);
         const canPost = member && member.role === 'admin';
         document.getElementById('inputArea').style.display = canPost ? 'flex' : 'none';
     
-        renderMessages(data.messages || [], true);
+        // --- ЗАГРУЗКА СООБЩЕНИЙ ---
+        const msgsData = await api('/api/messages?group=' + channelId);
+        renderMessages(msgsData.messages || [], true);
+        // --------------------------
+    
         connectWebSocket(currentChatId, currentChatType);
     }
 
@@ -2178,28 +2181,35 @@
 
     // ===== ОТОБРАЖЕНИЕ СООБЩЕНИЯ (обновлено с E2E) =====
     async function addMessageToUI(m, showSender = false) {
+        // Защита от дубликатов – если сообщение уже есть в DOM, не добавляем повторно
+        if (document.querySelector(`.message[data-message-id="${m.id}"]`)) {
+            return;
+        }
+    
         const container = document.getElementById('messages');
         const isOwn = m.senderId === user.id;
         const msgDiv = document.createElement('div');
         msgDiv.className = 'message' + (isOwn ? ' own' : '');
         msgDiv.dataset.messageId = m.id;
-
+    
         let content = '';
         if (showSender && !isOwn) {
             content += `<div class="msg-sender">${escapeHtml(m.senderName || 'User')}</div>`;
         }
-        
-        // Расшифровываем сообщение, если оно зашифровано
+    
         let messageText = m.content;
         console.log('Message data:', { id: m.id, encryptedContent: m.encryptedContent, encryptedKey: m.encryptedKey, nonce: m.nonce, content: m.content });
-
-        if (m.encryptedContent && m.nonce && 
-            m.encryptedContent !== '' && m.nonce !== '' && 
-            m.encryptedContent !== 'null' && m.nonce !== 'null' && 
-            privateKey) {
-            
+    
+        // --- ОТДЕЛЬНАЯ ВЕТКА ДЛЯ КАНАЛА ---
+        if (currentChatType === 'channel') {
+            // В канале сообщения не шифруются
+            messageText = m.content || '';
+        } else if (m.encryptedContent && m.nonce && 
+                   m.encryptedContent !== '' && m.nonce !== '' && 
+                   m.encryptedContent !== 'null' && m.nonce !== 'null' && 
+                   privateKey) {
+            // Групповое или личное сообщение
             if (currentChatType === 'group') {
-                // Групповое сообщение
                 const groupKey = groups[currentChat.id]?.key;
                 if (groupKey) {
                     try {
@@ -2231,19 +2241,18 @@
             console.log('Empty message', m.id);
             messageText = '';
         }
-        
+    
         if (m.type === 'image' && m.mediaData) {
             content += `<img class="msg-image" src="${escapeHtml(m.mediaData)}" onclick="viewImage(this.src)">`;
         } else {
             content += `<div class="msg-text">${escapeHtml(messageText || '')}</div>`;
         }
         content += `<div class="msg-time">${fmtTime(m.createdAt)}</div>`;
-
+    
         if (isOwn) {
             content += `<button class="delete-msg-btn" onclick="deleteMessage(${m.id})">🗑️</button>`;
         }
-
-        // Добавляем бейдж шифрования, если сообщение зашифровано
+    
         if (m.encryptedContent) {
             content += `
                 <span class="encrypted-badge">
@@ -2252,7 +2261,7 @@
                 </span>
             `;
         }
-
+    
         msgDiv.innerHTML = `<div class="msg-bubble">${content}</div>`;
         container.appendChild(msgDiv);
     }
@@ -2315,7 +2324,7 @@
                         body.encryptedContent = encrypted.encryptedContent;
                         body.encryptedKey = encrypted.encryptedKey;
                         body.nonce = encrypted.nonce;
-                        body.content = ''; // очищаем открытый текст
+                        body.content = '';
                     } catch (e) {
                         toast('Ошибка шифрования', 'Не удалось зашифровать сообщение', 'error');
                         return;
@@ -2330,15 +2339,17 @@
                         const encrypted = await CryptoHelper.encryptMessageWithKey(content, groupKey);
                         body.encryptedContent = encrypted.encryptedContent;
                         body.nonce = encrypted.nonce;
-                        // для групп encryptedKey не нужен
                         body.content = '';
                     } catch (e) {
                         toast('Ошибка шифрования', 'Не удалось зашифровать сообщение', 'error');
                         return;
                     }
                 } else {
-                    body.content = content; // fallback (не рекомендуется)
+                    body.content = content;
                 }
+            } else {
+                // Канал или другой тип – отправляем открытый текст
+                body.content = content;
             }
         }
     
@@ -2346,7 +2357,6 @@
         input.style.height = 'auto';
     
         if (ws && ws.readyState === WebSocket.OPEN) {
-            // Локальное отображение (для оптимистичного UI)
             const localMessage = {
                 id: msgId,
                 senderId: user.id,
