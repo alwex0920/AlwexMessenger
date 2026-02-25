@@ -464,7 +464,7 @@
                     <button class="icon-btn ripple" onclick="showModal('newChatModal')" title="Новый чат">
                         <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                     </button>
-                    <button class="icon-btn ripple" onclick="showModal('createGroupModal')" title="Создать группу">
+                    <button class="icon-btn ripple" onclick="showModal('')" title="Создать группу">
                         <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                     </button>
                     <button class="icon-btn ripple" onclick="showModal('settingsModal'); loadSessions();" title="Настройки">
@@ -557,6 +557,13 @@
                     <textarea id="groupDesc" placeholder="О чём эта группа?" maxlength="200"></textarea>
                 </div>
                 <div class="field">
+                    <label>Тип</label>
+                    <select id="groupType">
+                        <option value="group">Группа (E2E шифрование)</option>
+                        <option value="channel">Канал (публичный, без шифрования)</option>
+                    </select>
+                </div>
+                <div class="field">
                     <label>Добавить участников</label>
                     <div class="search" style="padding:0"><input type="text" id="groupUserSearch" placeholder="Поиск..." oninput="searchUsersForGroup(this.value)"></div>
                     <div class="group-members" id="selectedMembers"></div>
@@ -565,7 +572,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary btn-sm" onclick="closeModal('createGroupModal')">Отмена</button>
-                <button class="btn btn-primary btn-sm" onclick="createGroup()">Создать</button>
+                <button class="btn btn-primary btn-sm" onclick="createGroupOrChannel()">Создать</button>
             </div>
         </div>
     </div>
@@ -1207,6 +1214,48 @@
     let currentChatId = null;
     let currentGroupForAdd = null;
     let qrScanner = null;
+    let currentTab = 'chats';
+
+    (async function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        if (code) {
+            const data = await api('/api/channels/info?code=' + encodeURIComponent(code));
+            if (data.error) {
+                toast('Ошибка', data.error, 'error');
+            } else {
+                const ch = data.channel;
+                if (confirm(`Хотите подписаться на канал "${ch.name}"?`)) {
+                    await subscribeToChannel(code);
+                }
+            }
+            // Убираем параметр из URL, чтобы не мешал
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    })();
+
+    document.querySelectorAll('.chat-tab').forEach(tab => {
+        tab.onclick = () => {
+            document.querySelectorAll('.chat-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentTab = tab.dataset.tab;
+            filterChatList();
+        };
+    });
+    
+    function filterChatList() {
+        const items = document.querySelectorAll('.chat-item');
+        items.forEach(item => {
+            const type = item.dataset.type;
+            if (currentTab === 'chats' && (type === 'direct' || type === 'group')) {
+                item.style.display = 'flex';
+            } else if (currentTab === 'channels' && type === 'channel') {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
 
     async function startQRScanner() {
         // Проверяем поддержку
@@ -2009,13 +2058,16 @@
                         </div>
                     </div>
                 `;
-            } else if (c.type === 'group') {
+            } else if (c.type === 'group' || c.type === 'channel') {
                 groups[c.group.id] = c.group;
+                const isChannel = c.type === 'channel';
+                const badgeText = isChannel ? '📢 Канал' : 'Группа';
+                const clickHandler = isChannel ? `openChannel(${c.group.id})` : `openGroupChat(${c.group.id})`;
                 list.innerHTML += `
-                    <div class="chat-item" onclick="openGroupChat(${c.group.id})">
+                    <div class="chat-item" data-type="${c.type}" onclick="${clickHandler}">
                         <div class="avatar-wrap"><img src="${escapeHtml(c.group.avatar)}"></div>
                         <div class="chat-item-info">
-                            <div class="chat-item-name">${escapeHtml(c.group.name)} <span class="badge">Группа</span></div>
+                            <div class="chat-item-name">${escapeHtml(c.group.name)} <span class="badge">${badgeText}</span></div>
                             <div class="chat-item-msg">${escapeHtml(c.lastMessage || 'Нет сообщений')}</div>
                         </div>
                         <div class="chat-item-meta">
@@ -2072,6 +2124,29 @@
         }
     
         const data = await api('/api/messages?group=' + groupId);
+        renderMessages(data.messages || [], true);
+        connectWebSocket(currentChatId, currentChatType);
+    }
+
+    async function openChannel(channelId) {
+        disconnectWebSocket();
+        currentChat = groups[channelId] || { id: channelId };
+        currentChatType = 'channel';
+        currentChatId = 'channel-' + channelId;
+        setupChatUI();
+    
+        const data = await api('/api/groups/' + channelId);
+        if (data.error) { toast('Ошибка', data.error, 'error'); return; }
+    
+        document.getElementById('chatName').textContent = data.group.name;
+        document.getElementById('chatStatus').textContent = data.group.description || '';
+        document.getElementById('chatAvatar').src = data.group.avatar;
+    
+        // Определяем, может ли пользователь писать (админ)
+        const member = data.members.find(m => m.id === user.id);
+        const canPost = member && member.role === 'admin';
+        document.getElementById('inputArea').style.display = canPost ? 'flex' : 'none';
+    
         renderMessages(data.messages || [], true);
         connectWebSocket(currentChatId, currentChatType);
     }
@@ -2452,57 +2527,91 @@
         });
     }
 
-    async function createGroup() {
+    async function createGroupOrChannel() {
         const name = document.getElementById('groupName').value.trim();
         const desc = document.getElementById('groupDesc').value.trim();
-        if (!name) { toast('Ошибка', 'Введите название группы', 'error'); return; }
-        if (selectedGroupMembers.length === 0) { toast('Ошибка', 'Добавьте хотя бы одного участника', 'error'); return; }
+        const type = document.getElementById('groupType').value;
     
-        // Генерируем общий ключ группы (32 байта)
-        const groupKeyRaw = crypto.getRandomValues(new Uint8Array(32));
-        const groupKeyBase64 = btoa(String.fromCharCode(...groupKeyRaw));
+        if (!name) { toast('Ошибка', 'Введите название', 'error'); return; }
     
-        // Собираем всех участников (включая себя)
-        const allMemberIds = [user.id, ...selectedGroupMembers];
-        const groupKeys = [];
+        if (type === 'group') {
+            if (selectedGroupMembers.length === 0) { toast('Ошибка', 'Добавьте хотя бы одного участника', 'error'); return; }
     
-        for (const memberId of allMemberIds) {
-            // Убедимся, что у нас есть публичный ключ участника
-            if (!users[memberId] || !users[memberId].publicKey) {
-                // Попробуем загрузить
-                await ensureUserHasPublicKey(memberId);
+            // Генерируем общий ключ группы (32 байта)
+            const groupKeyRaw = crypto.getRandomValues(new Uint8Array(32));
+            const groupKeyBase64 = btoa(String.fromCharCode(...groupKeyRaw));
+    
+            // Собираем всех участников (включая себя)
+            const allMemberIds = [user.id, ...selectedGroupMembers];
+            const groupKeys = [];
+    
+            for (const memberId of allMemberIds) {
+                if (!users[memberId] || !users[memberId].publicKey) {
+                    await ensureUserHasPublicKey(memberId);
+                }
+                const member = users[memberId];
+                if (!member || !member.publicKey) {
+                    toast('Ошибка', `У пользователя ${member?.username || memberId} нет публичного ключа`, 'error');
+                    return;
+                }
+                const encryptedKey = await CryptoHelper.encryptKeyForUser(groupKeyBase64, member.publicKey);
+                groupKeys.push({ userId: memberId, encryptedKey });
             }
-            const member = users[memberId];
-            if (!member || !member.publicKey) {
-                toast('Ошибка', `У пользователя ${member?.username || memberId} нет публичного ключа`, 'error');
-                return;
-            }
-            const encryptedKey = await CryptoHelper.encryptKeyForUser(groupKeyBase64, member.publicKey);
-            groupKeys.push({ userId: memberId, encryptedKey });
-        }
     
-        const data = await api('/api/groups', {
-            method: 'POST',
-            body: {
-                name,
-                description: desc,
-                members: selectedGroupMembers,
-                groupKeys
-            }
-        });
+            const data = await api('/api/groups', {
+                method: 'POST',
+                body: {
+                    name,
+                    description: desc,
+                    type: 'group',
+                    members: selectedGroupMembers,
+                    groupKeys
+                }
+            });
     
-        if (data.error) { toast('Ошибка', data.error, 'error'); return; }
-        toast('Успешно!', 'Группа создана', 'success');
-        closeModal('createGroupModal');
-        document.getElementById('groupName').value = '';
-        document.getElementById('groupDesc').value = '';
-        selectedGroupMembers = [];
-        renderSelectedMembers();
-        await loadChats();
-        if (data.group) {
-            groups[data.group.id] = data.group;
-            groups[data.group.id].key = groupKeyBase64; // сохраняем ключ локально
-            openGroupChat(data.group.id);
+            if (data.error) { toast('Ошибка', data.error, 'error'); return; }
+            toast('Успешно!', 'Группа создана', 'success');
+            closeModal('createGroupModal');
+            document.getElementById('groupName').value = '';
+            document.getElementById('groupDesc').value = '';
+            selectedGroupMembers = [];
+            renderSelectedMembers();
+            await loadChats();
+            if (data.group) {
+                groups[data.group.id] = data.group;
+                groups[data.group.id].key = groupKeyBase64;
+                openGroupChat(data.group.id);
+            }
+        } else {
+            // Создание канала
+            const data = await api('/api/groups', {
+                method: 'POST',
+                body: {
+                    name,
+                    description: desc,
+                    type: 'channel'
+                }
+            });
+    
+            if (data.error) { toast('Ошибка', data.error, 'error'); return; }
+            toast('Успешно!', 'Канал создан', 'success');
+            closeModal('createGroupModal');
+            document.getElementById('groupName').value = '';
+            document.getElementById('groupDesc').value = '';
+    
+            // Копируем ссылку-приглашение
+            const inviteLink = `${window.location.origin}?code=${data.group.inviteCode}`;
+            navigator.clipboard.writeText(inviteLink).then(() => {
+                toast('Ссылка скопирована', 'Вы можете поделиться ей', 'success');
+            }).catch(() => {
+                prompt('Ссылка для приглашения:', inviteLink);
+            });
+    
+            await loadChats();
+            if (data.group) {
+                groups[data.group.id] = data.group;
+                openChannel(data.group.id); // функция openChannel описана ниже
+            }
         }
     }
 
