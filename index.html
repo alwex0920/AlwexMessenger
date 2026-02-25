@@ -2622,9 +2622,9 @@
 
     function showChatInfo() {
         if (!currentChat) return;
-        if (currentChatType === 'group') {
+        if (currentChatType === 'group' || currentChatType === 'channel') {
             showGroupInfo(currentChat.id);
-        } else {
+        } else if (currentChatType === 'direct') {
             showUserProfile(currentChat.id);
         }
     }
@@ -2644,8 +2644,9 @@
         const isOwner = data.group.ownerId === user.id;
         const isAdmin = data.members.some(m => m.id === user.id && m.role === 'admin');
 
-        document.getElementById('groupAdminActions').style.display = (isOwner || isAdmin) ? 'block' : 'none';
-        document.getElementById('leaveGroupBtn').style.display = isOwner ? 'none' : 'block';
+        const isChannel = data.group.type === 'channel';
+        document.getElementById('groupAdminActions').style.display = (isOwner || isAdmin) && !isChannel ? 'block' : 'none';
+        document.getElementById('leaveGroupBtn').style.display = isOwner ? 'none' : (isChannel ? 'none' : 'block');
 
         const membersList = document.getElementById('groupMembersList');
         membersList.innerHTML = '';
