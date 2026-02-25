@@ -1030,10 +1030,28 @@
                     importedPublicKey,
                     exportedKey
                 );
+
+                let encryptedKeyForSender = null;
+                if (senderPublicKey) {
+                    const importedSenderKey = await crypto.subtle.importKey(
+                        'spki',
+                        this.base64ToArrayBuffer(senderPublicKey),
+                        { name: 'RSA-OAEP', hash: 'SHA-256' },
+                        false,
+                        ['encrypt']
+                    );
+                    const encryptedForSender = await crypto.subtle.encrypt(
+                        { name: 'RSA-OAEP' },
+                        importedSenderKey,
+                        exportedKey
+                    );
+                    encryptedKeyForSender = this.arrayBufferToBase64(encryptedForSender);
+                }
                 
                 return {
                     encryptedContent: this.arrayBufferToBase64(encryptedContent),
                     encryptedKey: this.arrayBufferToBase64(encryptedKey),
+                    encryptedKeyForSender,
                     nonce: this.arrayBufferToBase64(nonce)
                 };
             } catch (error) {
@@ -2224,6 +2242,11 @@
             } else {
                 // Личное сообщение
                 try {
+                    let keyToUse = m.encryptedKey;
+                    // Если это своё сообщение и есть специальный ключ для себя, используем его
+                    if (isOwn && m.encryptedKeyForSender) {
+                        keyToUse = m.encryptedKeyForSender;
+                    }
                     messageText = await CryptoHelper.decryptMessage({
                         encryptedContent: m.encryptedContent,
                         encryptedKey: m.encryptedKey,
@@ -2320,9 +2343,13 @@
                 const recipientPublicKey = users[currentChat.id]?.publicKey;
                 if (recipientPublicKey && privateKey) {
                     try {
-                        const encrypted = await CryptoHelper.encryptMessage(content, recipientPublicKey);
+                        // Передаём свой публичный ключ для шифрования копии для себя
+                        const encrypted = await CryptoHelper.encryptMessage(content, recipientPublicKey, user.publicKey);
                         body.encryptedContent = encrypted.encryptedContent;
                         body.encryptedKey = encrypted.encryptedKey;
+                        if (encrypted.encryptedKeyForSender) {
+                            body.encryptedKeyForSender = encrypted.encryptedKeyForSender;
+                        }
                         body.nonce = encrypted.nonce;
                         body.content = '';
                     } catch (e) {
