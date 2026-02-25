@@ -993,16 +993,14 @@
         },
         
         // Шифрование сообщения
-        async encryptMessage(message, recipientPublicKey) {
+        async encryptMessage(message, recipientPublicKey, senderPublicKey = null) {
             try {
-                // Генерируем симметричный ключ
                 const symmetricKey = await crypto.subtle.generateKey(
                     { name: 'AES-GCM', length: 256 },
                     true,
                     ['encrypt', 'decrypt']
                 );
                 
-                // Шифруем сообщение
                 const nonce = crypto.getRandomValues(new Uint8Array(12));
                 const encoder = new TextEncoder();
                 const encodedMessage = encoder.encode(message);
@@ -1013,24 +1011,22 @@
                     encodedMessage
                 );
                 
-                // Экспортируем симметричный ключ
                 const exportedKey = await crypto.subtle.exportKey('raw', symmetricKey);
                 
-                // Шифруем ключ публичным ключом получателя
-                const importedPublicKey = await crypto.subtle.importKey(
+                // Шифруем ключ для получателя
+                const importedRecipientKey = await crypto.subtle.importKey(
                     'spki',
                     this.base64ToArrayBuffer(recipientPublicKey),
                     { name: 'RSA-OAEP', hash: 'SHA-256' },
                     false,
                     ['encrypt']
                 );
-                
                 const encryptedKey = await crypto.subtle.encrypt(
                     { name: 'RSA-OAEP' },
-                    importedPublicKey,
+                    importedRecipientKey,
                     exportedKey
                 );
-
+        
                 let encryptedKeyForSender = null;
                 if (senderPublicKey) {
                     const importedSenderKey = await crypto.subtle.importKey(
