@@ -2098,6 +2098,11 @@
     }
 
     async function openGroupChat(groupId) {
+        if (groups[groupId]?.type !== 'group') {
+            console.warn('Not a group, opening as channel');
+            openChannel(groupId);
+            return;
+        }
         disconnectWebSocket();
         currentChat = groups[groupId] || { id: groupId };
         currentChatType = 'group';
