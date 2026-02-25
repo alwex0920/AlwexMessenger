@@ -2269,6 +2269,7 @@
         content += `<div class="msg-time">${fmtTime(m.createdAt)}</div>`;
     
         if (isOwn) {
+            console.log('Own message', m.id, 'encryptedKeyForSender?', m.encryptedKeyForSender);
             content += `<button class="delete-msg-btn" onclick="deleteMessage(${m.id})">🗑️</button>`;
         }
     
