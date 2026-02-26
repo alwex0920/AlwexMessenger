@@ -762,6 +762,13 @@
                     <div class="profile-name" id="groupInfoName"></div>
                     <div class="profile-username" id="groupInfoDesc"></div>
                 </div>
+                <div class="settings-section" id="channelInviteSection" style="display:none;">
+                    <h3>Ссылка-приглашение</h3>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="channelInviteLink" readonly style="flex:1; padding:8px; background:var(--bg3); border:1px solid var(--border); border-radius:6px; color:var(--text);">
+                        <button class="btn btn-secondary btn-sm" onclick="copyChannelInvite()">Копировать</button>
+                    </div>
+                </div>
                 <div class="settings-section">
                     <h3>Участники (<span id="groupMemberCount">0</span>)</h3>
                     <div id="groupMembersList"></div>
@@ -1502,6 +1509,16 @@
         const text = document.getElementById('exportKeyString').textContent;
         navigator.clipboard.writeText(text).then(() => {
             toast('Скопировано', 'Строка ключа скопирована в буфер', 'success');
+        }).catch(() => {
+            toast('Ошибка', 'Не удалось скопировать', 'error');
+        });
+    }
+
+    function copyChannelInvite() {
+        const link = document.getElementById('channelInviteLink');
+        link.select();
+        navigator.clipboard.writeText(link.value).then(() => {
+            toast('Скопировано', 'Ссылка скопирована', 'success');
         }).catch(() => {
             toast('Ошибка', 'Не удалось скопировать', 'error');
         });
@@ -2691,6 +2708,15 @@
         const isAdmin = data.members.some(m => m.id === user.id && m.role === 'admin');
 
         const isChannel = data.group.type === 'channel';
+        const inviteSection = document.getElementById('channelInviteSection');
+        const inviteLinkInput = document.getElementById('channelInviteLink');
+        if (isChannel) {
+            const inviteLink = window.location.origin + '?code=' + data.group.inviteCode;
+            inviteLinkInput.value = inviteLink;
+            inviteSection.style.display = 'block';
+        } else {
+            inviteSection.style.display = 'none';
+        }
         document.getElementById('groupAdminActions').style.display = (isOwner || isAdmin) && !isChannel ? 'block' : 'none';
         document.getElementById('leaveGroupBtn').style.display = isOwner ? 'none' : (isChannel ? 'none' : 'block');
 
