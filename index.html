@@ -757,8 +757,14 @@
                 <button class="icon-btn ripple" onclick="closeModal('groupInfoModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
             </div>
             <div class="modal-body">
-                <div class="profile-header">
+                <div class="profile-header" style="position: relative;">
                     <img class="profile-avatar" id="groupInfoAvatar" src="">
+                    <button class="icon-btn small" id="editGroupAvatarBtn" style="position: absolute; bottom: 0; right: 0;" onclick="document.getElementById('groupAvatarInput').click()">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M3 17.46v3.04c0 .28.22.5.5.5h3.04c.13 0 .26-.05.35-.15L17.81 9.94l-3.75-3.75L3.15 17.1c-.1.1-.15.22-.15.36zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                        </svg>
+                    </button>
+                    <input type="file" id="groupAvatarInput" accept="image/*" style="display:none" onchange="previewGroupAvatar(this)">
                     <div class="profile-name" id="groupInfoName"></div>
                     <div class="profile-username" id="groupInfoDesc"></div>
                 </div>
@@ -1263,7 +1269,56 @@
             filterChatList();
         };
     });
+
+    // Предпросмотр аватара группы (опционально)
+    function previewGroupAvatar(input) {
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+        if (file.size > 500000) {
+            toast('Ошибка', 'Изображение слишком большое (макс. 500KB)', 'error');
+            input.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = e => {
+            // Можно показать превью во временном месте, но для простоты сразу загружаем
+            uploadGroupAvatar(e.target.result);
+        };
+        reader.readAsDataURL(file);
+    }
     
+    // Загрузка аватара группы
+    async function uploadGroupAvatar(imageData) {
+        const groupId = window.currentGroupId; // предполагаем, что эта переменная установлена в showGroupInfo
+        if (!groupId) return;
+    
+        const data = await api('/api/groups/avatar', {
+            method: 'POST',
+            body: { groupId, image: imageData }
+        });
+    
+        if (data.error) {
+            toast('Ошибка', data.error, 'error');
+            return;
+        }
+    
+        // Обновляем аватар в текущем чате (если он открыт)
+        if (currentChat && currentChat.id === groupId) {
+            currentChat.avatar = data.avatar;
+            document.getElementById('chatAvatar').src = data.avatar;
+        }
+        // Обновляем аватар в модальном окне
+        document.getElementById('groupInfoAvatar').src = data.avatar;
+        // Обновляем аватар в списке чатов (нужно обновить groups[groupId])
+        if (groups[groupId]) {
+            groups[groupId].avatar = data.avatar;
+            // Можно также обновить DOM-элемент списка, но проще перезагрузить список
+            await loadChats();
+        }
+    
+        toast('Успешно', 'Аватар обновлён', 'success');
+    }
+        
     function filterChatList() {
         const items = document.querySelectorAll('.chat-item');
         items.forEach(item => {
