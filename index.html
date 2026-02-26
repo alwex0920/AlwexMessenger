@@ -2176,6 +2176,7 @@
     
         // --- ЗАГРУЗКА СООБЩЕНИЙ ---
         const msgsData = await api('/api/messages?group=' + channelId);
+        console.log('Messages from server for channel', channelId, msgsData.messages); // ЛОГ
         renderMessages(msgsData.messages || [], true);
         // --------------------------
     
@@ -2226,6 +2227,7 @@
         // --- ОТДЕЛЬНАЯ ВЕТКА ДЛЯ КАНАЛА ---
         if (currentChatType === 'channel') {
             // В канале сообщения не шифруются
+            console.log('Channel message:', m); // ЛОГ
             messageText = m.content || '';
         } else if (m.encryptedContent && m.nonce && 
                    m.encryptedContent !== '' && m.nonce !== '' && 
