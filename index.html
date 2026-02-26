@@ -1755,35 +1755,44 @@
             if (data.type === 'message') {
                 addMessageToUI(data.message, currentChatType === 'group');
                 document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+
+                if (currentChatType === 'direct' && data.message.senderId !== user.id) {
+                    loadChats(); // обновляет список чатов в боковой панели
+                }
     
                 // ---------- УВЕДОМЛЕНИЯ ----------
                 // Показываем уведомление, если вкладка не активна и сообщение не от текущего пользователя
-                if (document.hidden && data.message.senderId !== user.id) {
+                if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden && data.message.senderId !== user.id) {
                     let title = '';
                     let body = '';
-    
+                
                     if (currentChatType === 'group') {
-                        // Для группы: заголовок = название группы, тело = имя отправителя + текст
                         title = currentChat?.name || 'Группа';
                         body = `${data.message.senderName || 'Пользователь'}: `;
+                    } else if (currentChatType === 'channel') {
+                        title = currentChat?.name || 'Канал';
+                        body = `${data.message.senderName || 'Администратор'}: `;
                     } else {
-                        // Для личного чата: заголовок = имя отправителя
                         title = data.message.senderName || 'Пользователь';
                     }
-    
-                    // Добавляем содержимое сообщения
+                
                     if (data.message.type === 'image') {
                         body += '📷 Изображение';
                     } else {
                         body += (data.message.content || 'Новое сообщение');
                     }
-    
-                    // Показываем уведомление, если разрешено
-                    if (Notification.permission === 'granted') {
+                
+                    // Иконка: используем аватар отправителя, если есть, иначе /favicon.ico
+                    const icon = data.message.senderAvatar || '/favicon.ico';
+                
+                    try {
                         new Notification(title, {
                             body: body,
-                            icon: data.message.senderAvatar || '/favicon.ico' // путь к иконке по умолчанию
+                            icon: icon,
+                            tag: 'alwex-message' // объединяет уведомления в одно, если их много
                         });
+                    } catch (e) {
+                        console.error('Notification error:', e);
                     }
                 }
                 // ---------------------------------
