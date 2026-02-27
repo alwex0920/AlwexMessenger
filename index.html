@@ -2291,6 +2291,7 @@
 
     // ===== Чат =====
     async function openDirectChat(userId) {
+        updatePinnedMessageBar(null);
         disconnectWebSocket();
         currentChat = users[userId] || { id: userId };
         currentChatType = 'direct';
@@ -2308,6 +2309,7 @@
     }
 
     async function openGroupChat(groupId) {
+        updatePinnedMessageBar(null);
         if (groups[groupId]?.type !== 'group') {
             console.warn('Not a group, opening as channel');
             openChannel(groupId);
@@ -2357,6 +2359,7 @@
     }
 
     async function openChannel(channelId) {
+        updatePinnedMessageBar(null);
         disconnectWebSocket();
         currentChat = groups[channelId] || { id: channelId };
         currentChatType = 'channel';
