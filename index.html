@@ -347,15 +347,16 @@
         }
 
         .msg-bubble {
-            position: relative;           /* нужно для позиционирования кнопок */
+            position: relative;
+            display: inline-block;        /* чтобы ширина была по содержимому */
             max-width: 100%;
-            width: fit-content;
-            word-break: break-word;
-            overflow-wrap: break-word;
-            white-space: pre-wrap;
+            width: fit-content;           /* поддерживается всеми современными браузерами */
+            word-break: break-all;        /* разрывает длинные слова в любом месте */
+            overflow-wrap: anywhere;      /* современный аналог break-word */
+            hyphens: auto;                /* включает автоматические переносы (не везде работает) */
+            white-space: pre-wrap;        /* сохраняет пробелы, но переносит */
             padding: 10px 14px;
             border-radius: 16px;
-            display: inline-block;
         }
         
         .message:not(.own) .msg-bubble {
