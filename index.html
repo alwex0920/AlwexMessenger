@@ -321,6 +321,34 @@
             height: 12px;
             fill: var(--success);
         }
+
+        .pin-msg-btn {
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            padding: 0;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .message:hover .pin-msg-btn {
+            display: flex;
+            opacity: 1;
+        }
+        .pin-msg-btn:hover {
+            transform: scale(1.1);
+        }
+        
         /* Адаптивный QR-код */
         #qrcode {
             width: 256px;
@@ -500,6 +528,12 @@
                     <div class="chat-head-status" id="chatStatus"></div>
                 </div>
             </header>
+            <div id="pinnedMessageBar" style="display:none; padding:8px 16px; background:var(--bg3); border-bottom:1px solid var(--border); align-items: center; gap: 8px;">
+                <span>📌</span>
+                <span id="pinnedMessageContent" style="flex:1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                <button class="btn-text btn-sm" id="goToPinnedMessageBtn" onclick="goToPinnedMessage()">Перейти</button>
+                <button class="icon-btn small" id="unpinMessageBtn" onclick="unpinMessage()" title="Открепить">✖</button>
+            </div>
             <div class="messages" id="messages" style="display:none"></div>
             <div class="typing" id="typing"><div class="typing-bubble"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>
             <div class="image-preview" id="imagePreview">
@@ -1242,6 +1276,63 @@
     let currentGroupForAdd = null;
     let qrScanner = null;
     let currentTab = 'chats';
+    let pinnedMessageId = null; // глобально или в области видимости чата
+
+    // Показать/обновить плашку закреплённого сообщения
+    function updatePinnedMessageBar(pinnedMessage) {
+        const bar = document.getElementById('pinnedMessageBar');
+        const contentSpan = document.getElementById('pinnedMessageContent');
+        const unpinBtn = document.getElementById('unpinMessageBtn');
+    
+        if (pinnedMessage) {
+            pinnedMessageId = pinnedMessage.id;
+            contentSpan.textContent = pinnedMessage.content || (pinnedMessage.type === 'image' ? '📷 Изображение' : '');
+            bar.style.display = 'flex';
+            // Показывать кнопку открепления только админам
+            unpinBtn.style.display = (currentChat && (currentChat.role === 'admin' || currentChat.ownerId === user.id)) ? 'block' : 'none';
+        } else {
+            pinnedMessageId = null;
+            bar.style.display = 'none';
+        }
+    }
+    
+    // Закрепить сообщение
+    async function pinMessage(messageId) {
+        const data = await api('/api/messages/' + messageId + '/pin', { method: 'POST' });
+        if (data.error) {
+            toast('Ошибка', data.error, 'error');
+            return;
+        }
+        // Обновить информацию о чате, чтобы получить закреплённое сообщение
+        const groupData = await api('/api/groups/' + currentChat.id);
+        if (groupData.group && groupData.group.pinnedMessage) {
+            updatePinnedMessageBar(groupData.group.pinnedMessage);
+        }
+        toast('Успешно', 'Сообщение закреплено', 'success');
+    }
+    
+    // Открепить сообщение
+    async function unpinMessage() {
+        if (!pinnedMessageId) return;
+        const data = await api('/api/messages/' + pinnedMessageId + '/pin', { method: 'DELETE' });
+        if (data.error) {
+            toast('Ошибка', data.error, 'error');
+            return;
+        }
+        updatePinnedMessageBar(null);
+        toast('Успешно', 'Сообщение откреплено', 'success');
+    }
+    
+    // Перейти к закреплённому сообщению (прокрутить)
+    function goToPinnedMessage() {
+        if (!pinnedMessageId) return;
+        const msgElement = document.querySelector(`.message[data-message-id="${pinnedMessageId}"]`);
+        if (msgElement) {
+            msgElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            toast('Ошибка', 'Сообщение не найдено в текущем списке', 'error');
+        }
+    }
 
     (async function() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -2230,6 +2321,14 @@
         document.getElementById('chatName').textContent = currentChat.name || 'Группа';
         document.getElementById('chatStatus').textContent = (currentChat.memberCount || 0) + ' участников';
         document.getElementById('chatAvatar').src = currentChat.avatar || '';
+        const member = data.members.find(m => m.id === user.id);
+        if (member) {
+            currentChat.role = member.role;
+            currentChat.ownerId = data.group.ownerId;
+        } else {
+            currentChat.role = null;
+            currentChat.ownerId = null;
+        }
     
         // Загружаем ключ группы, если ещё нет
         if (!groups[groupId].key) {
@@ -2248,6 +2347,11 @@
         }
     
         const data = await api('/api/messages?group=' + groupId);
+        if (data.group.pinnedMessage) {
+            updatePinnedMessageBar(data.group.pinnedMessage);
+        } else {
+            updatePinnedMessageBar(null);
+        }
         renderMessages(data.messages || [], true);
         connectWebSocket(currentChatId, currentChatType);
     }
@@ -2260,6 +2364,11 @@
         setupChatUI();
     
         const data = await api('/api/groups/' + channelId);
+        if (data.group.pinnedMessage) {
+            updatePinnedMessageBar(data.group.pinnedMessage);
+        } else {
+            updatePinnedMessageBar(null);
+        }
         if (data.error) { toast('Ошибка', data.error, 'error'); return; }
     
         document.getElementById('chatName').textContent = data.group.name;
@@ -2269,6 +2378,13 @@
         const member = data.members.find(m => m.id === user.id);
         const canPost = member && member.role === 'admin';
         document.getElementById('inputArea').style.display = canPost ? 'flex' : 'none';
+        if (member) {
+            currentChat.role = member.role;
+            currentChat.ownerId = data.group.ownerId;
+        } else {
+            currentChat.role = null;
+            currentChat.ownerId = null;
+        }
     
         // --- ЗАГРУЗКА СООБЩЕНИЙ ---
         const msgsData = await api('/api/messages?group=' + channelId);
@@ -2378,6 +2494,12 @@
         if (isOwn) {
             console.log('Own message', m.id, 'encryptedKeyForSender?', m.encryptedKeyForSender);
             content += `<button class="delete-msg-btn" onclick="deleteMessage(${m.id})">🗑️</button>`;
+        }
+
+        if (isOwn || (currentChat?.role === 'admin' || currentChat?.ownerId === user.id)) {
+            if ((currentChatType === 'group' || currentChatType === 'channel') && !m.isPinned) {
+                content += `<button class="pin-msg-btn" onclick="pinMessage(${m.id})">📌</button>`;
+            }
         }
     
         if (m.encryptedContent) {
