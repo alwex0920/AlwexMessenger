@@ -346,15 +346,21 @@
             transform: scale(1.1);
         }
 
+        .message {
+            max-width: 75%;
+            width: auto;
+        }
+
         .msg-bubble {
             position: relative;
-            display: inline-block;        /* чтобы ширина была по содержимому */
-            max-width: 100%;
-            width: fit-content;           /* поддерживается всеми современными браузерами */
-            word-break: break-all;        /* разрывает длинные слова в любом месте */
-            overflow-wrap: anywhere;      /* современный аналог break-word */
+            display: inline-block !important;        /* чтобы ширина была по содержимому */
+            max-width: 100% !important;
+            min-width: 50px;
+            width: auto !important;           /* поддерживается всеми современными браузерами */
+            word-break: break-all !important;        /* разрывает длинные слова в любом месте */
+            overflow-wrap: break-word !important;      /* современный аналог break-word */
             hyphens: auto;                /* включает автоматические переносы (не везде работает) */
-            white-space: pre-wrap;        /* сохраняет пробелы, но переносит */
+            white-space: pre-wrap !important;        /* сохраняет пробелы, но переносит */
             padding: 10px 14px;
             border-radius: 16px;
         }
