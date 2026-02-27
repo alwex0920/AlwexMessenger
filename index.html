@@ -348,6 +348,25 @@
         .pin-msg-btn:hover {
             transform: scale(1.1);
         }
+
+        .msg-bubble {
+            max-width: 100%;
+            word-break: break-word;      /* разрывает длинные слова */
+            overflow-wrap: break-word;   /* альтернативное свойство для переноса */
+            white-space: pre-wrap;       /* сохраняет форматирование, но переносит */
+        }
+        
+        .msg-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        /* Для мобильных устройств можно увеличить допустимую ширину */
+        @media (max-width: 768px) {
+            .message {
+                max-width: 85%; /* или можно задать фиксированное значение, например 300px */
+            }
+        }
         
         /* Адаптивный QR-код */
         #qrcode {
@@ -2323,14 +2342,28 @@
         document.getElementById('chatName').textContent = currentChat.name || 'Группа';
         document.getElementById('chatStatus').textContent = (currentChat.memberCount || 0) + ' участников';
         document.getElementById('chatAvatar').src = currentChat.avatar || '';
-        const member = data.members.find(m => m.id === user.id);
+    
+        // --- НОВЫЙ КОД: загружаем данные группы (чтобы получить pinnedMessage и роль) ---
+        const groupData = await api('/api/groups/' + groupId);
+        if (groupData.error) {
+            toast('Ошибка', groupData.error, 'error');
+            return;
+        }
+        const member = groupData.members.find(m => m.id === user.id);
         if (member) {
             currentChat.role = member.role;
-            currentChat.ownerId = data.group.ownerId;
+            currentChat.ownerId = groupData.group.ownerId;
         } else {
             currentChat.role = null;
             currentChat.ownerId = null;
         }
+        // Отображаем закреплённое сообщение, если есть
+        if (groupData.group.pinnedMessage) {
+            updatePinnedMessageBar(groupData.group.pinnedMessage);
+        } else {
+            updatePinnedMessageBar(null);
+        }
+        // ---------------------------------------------------------------------------------
     
         // Загружаем ключ группы, если ещё нет
         if (!groups[groupId].key) {
@@ -2348,13 +2381,8 @@
             }
         }
     
-        const data = await api('/api/messages?group=' + groupId);
-        if (data.group.pinnedMessage) {
-            updatePinnedMessageBar(data.group.pinnedMessage);
-        } else {
-            updatePinnedMessageBar(null);
-        }
-        renderMessages(data.messages || [], true);
+        const msgsData = await api('/api/messages?group=' + groupId);
+        renderMessages(msgsData.messages || [], true);
         connectWebSocket(currentChatId, currentChatType);
     }
 
