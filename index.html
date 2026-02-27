@@ -1270,6 +1270,30 @@
         };
     });
 
+    async function subscribeToChannel(inviteCode) {
+        if (!token) {
+            toast('Ошибка', 'Необходимо авторизоваться', 'error');
+            return;
+        }
+        const data = await api('/api/channels/subscribe', {
+            method: 'POST',
+            body: { inviteCode }
+        });
+        if (data.error) {
+            toast('Ошибка', data.error, 'error');
+            return;
+        }
+        toast('Успешно', 'Вы подписались на канал', 'success');
+        await loadChats(); // обновляем список чатов
+    
+        // Если сервер вернул channelId, открываем канал сразу
+        if (data.channelId) {
+            // Убедимся, что канал уже загружен в объект groups (loadChats должен был это сделать)
+            // Можно просто вызвать openChannel, но нужно подождать, пока loadChats завершится
+            openChannel(data.channelId);
+        }
+    }
+
     // Предпросмотр аватара группы (опционально)
     function previewGroupAvatar(input) {
         if (!input.files || !input.files[0]) return;
