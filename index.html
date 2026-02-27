@@ -351,21 +351,59 @@
 
         .msg-bubble {
             max-width: 100%;
-            word-break: break-word;      /* разрывает длинные слова */
-            overflow-wrap: break-word;   /* альтернативное свойство для переноса */
-            white-space: pre-wrap;       /* сохраняет форматирование, но переносит */
+            width: fit-content;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+            padding: 10px 14px;
+            border-radius: 16px;
+        }
+
+        /* Адаптация плашки закреплённого сообщения */
+        #pinnedMessageBar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg3);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        #pinnedMessageContent {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+        
+        @media (max-width: 768px) {
+            #pinnedMessageBar {
+                padding: 6px 12px;
+                gap: 4px;
+                font-size: 13px;
+            }
+            #pinnedMessageBar .btn-text,
+            #pinnedMessageBar .icon-btn {
+                font-size: 12px;
+                padding: 4px 8px;
+            }
+            #pinnedMessageContent {
+                max-width: 150px;
+            }
+        }
+        
+        /* Для мобильных устройств уменьшаем отступы */
+        @media (max-width: 768px) {
+            .msg-bubble {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
         }
         
         .msg-text {
             white-space: pre-wrap;
             word-break: break-word;
-        }
-        
-        /* Для мобильных устройств можно увеличить допустимую ширину */
-        @media (max-width: 768px) {
-            .message {
-                max-width: 85%; /* или можно задать фиксированное значение, например 300px */
-            }
         }
         
         /* Адаптивный QR-код */
