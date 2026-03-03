@@ -1355,8 +1355,13 @@
             pinnedMessageId = pinnedMessage.id;
             contentSpan.textContent = pinnedMessage.content || (pinnedMessage.type === 'image' ? '📷 Изображение' : '');
             bar.style.display = 'flex';
-            // Показывать кнопку открепления только админам
-            unpinBtn.style.display = (currentChat && (currentChat.role === 'admin' || currentChat.ownerId === user.id)) ? 'block' : 'none';
+            
+            // Кнопка открепления: для личных чатов показываем всегда, для групп/каналов — только админам
+            if (currentChatType === 'direct') {
+                unpinBtn.style.display = 'block';
+            } else {
+                unpinBtn.style.display = (currentChat && (currentChat.role === 'admin' || currentChat.ownerId === user.id)) ? 'block' : 'none';
+            }
         } else {
             pinnedMessageId = null;
             bar.style.display = 'none';
@@ -2372,6 +2377,19 @@
     
         const data = await api('/api/messages?with=' + userId);
         renderMessages(data.messages || []);
+        // Загружаем закреплённое сообщение
+        const chatId = [Math.min(user.id, userId), Math.max(user.id, userId)].join('-');
+        const pinnedData = await api('/api/direct/pin?chatId=' + chatId);
+        if (pinnedData.pinnedMessage) {
+            // Преобразуем в формат, понятный updatePinnedMessageBar
+            const msg = pinnedData.pinnedMessage;
+            updatePinnedMessageBar({
+                id: msg.id,
+                content: msg.content,
+                type: msg.type,
+                mediaData: msg.mediaData
+            });
+        }
         connectWebSocket(currentChatId, currentChatType);
     }
 
@@ -2580,6 +2598,11 @@
                 content += `<button class="pin-msg-btn" onclick="pinMessage(${m.id})">📌</button>`;
             }
         }
+
+        if (currentChatType === 'direct') {
+            // Кнопка закрепления для личных чатов
+            content += `<button class="pin-msg-btn" onclick="pinDirectMessage(${m.id})">📌</button>`;
+        }
     
         if (m.encryptedContent) {
             content += `
@@ -2594,6 +2617,41 @@
         container.appendChild(msgDiv);
     }
 
+    async function pinDirectMessage(messageId) {
+        const chatId = currentChatId.replace('direct-', '');
+        const data = await api('/api/direct/pin', {
+            method: 'POST',
+            body: { chatId, messageId }
+        });
+        if (data.error) {
+            toast('Ошибка', data.error, 'error');
+            return;
+        }
+        // Обновляем плашку (нужно получить сообщение)
+        const pinnedData = await api('/api/direct/pin?chatId=' + chatId);
+        if (pinnedData.pinnedMessage) {
+            const msg = pinnedData.pinnedMessage;
+            updatePinnedMessageBar({
+                id: msg.id,
+                content: msg.content,
+                type: msg.type,
+                mediaData: msg.mediaData
+            });
+        }
+        toast('Успешно', 'Сообщение закреплено', 'success');
+    }
+    
+    async function unpinDirectMessage() {
+        const chatId = currentChatId.replace('direct-', '');
+        const data = await api('/api/direct/pin?chatId=' + chatId, { method: 'DELETE' });
+        if (data.error) {
+            toast('Ошибка', data.error, 'error');
+            return;
+        }
+        updatePinnedMessageBar(null);
+        toast('Успешно', 'Сообщение откреплено', 'success');
+    }
+        
     async function deleteMessage(messageId) {
         if (!confirm('Удалить сообщение?')) return;
         const data = await api('/api/messages/' + messageId, { method: 'DELETE' });
