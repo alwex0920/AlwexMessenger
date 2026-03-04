@@ -1386,13 +1386,18 @@
     // Открепить сообщение
     async function unpinMessage() {
         if (!pinnedMessageId) return;
-        const data = await api('/api/messages/' + pinnedMessageId + '/pin', { method: 'DELETE' });
-        if (data.error) {
-            toast('Ошибка', data.error, 'error');
-            return;
+    
+        if (currentChatType === 'direct') {
+            await unpinDirectMessage();
+        } else {
+            const data = await api('/api/messages/' + pinnedMessageId + '/pin', { method: 'DELETE' });
+            if (data.error) {
+                toast('Ошибка', data.error, 'error');
+                return;
+            }
+            updatePinnedMessageBar(null);
+            toast('Успешно', 'Сообщение откреплено', 'success');
         }
-        updatePinnedMessageBar(null);
-        toast('Успешно', 'Сообщение откреплено', 'success');
     }
     
     // Перейти к закреплённому сообщению (прокрутить)
