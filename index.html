@@ -1389,6 +1389,7 @@
     let currentPostId = null;
 
     function openComments(postId, commentCount) {
+        console.log('Opening comments for post', postId, 'in group', currentChat.id);
         currentPostId = postId;
         document.getElementById('commentInput').value = '';
         loadComments(postId);
@@ -1396,7 +1397,10 @@
     }
     
     async function loadComments(postId) {
-        const data = await api('/api/messages?group=' + currentChat.id + '&postId=' + postId);
+        const url = '/api/messages?group=' + currentChat.id + '&postId=' + postId;
+        console.log('Loading comments from', url);
+        const data = await api(url);
+        console.log('Comments response:', data);
         const list = document.getElementById('commentsList');
         list.innerHTML = '';
         if (!data.messages || data.messages.length === 0) {
