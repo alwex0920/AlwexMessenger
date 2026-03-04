@@ -1345,18 +1345,52 @@
     let currentTab = 'chats';
     let pinnedMessageId = null; // глобально или в области видимости чата
 
+    async function getDecryptedMessageText(message) {
+        // Если это изображение – сразу возвращаем иконку
+        if (message.type === 'image') return '📷 Изображение';
+        
+        // Если нет зашифрованных полей – возвращаем обычный текст
+        if (!message.encryptedContent || !message.nonce || message.encryptedContent === '' || message.nonce === '') {
+            return message.content || '';
+        }
+    
+        // Расшифровка для личных чатов и групп
+        try {
+            if (currentChatType === 'group') {
+                // Групповое сообщение: используем ключ группы
+                const groupKey = groups[currentChat.id]?.key;
+                if (!groupKey) return '🔒 [Ключ группы недоступен]';
+                return await CryptoHelper.decryptMessageWithKey(message.encryptedContent, message.nonce, groupKey);
+            } else {
+                // Личное сообщение
+                let keyToUse = message.encryptedKey;
+                if (message.senderId === user.id && message.encryptedKeyForSender) {
+                    keyToUse = message.encryptedKeyForSender;
+                }
+                return await CryptoHelper.decryptMessage({
+                    encryptedContent: message.encryptedContent,
+                    encryptedKey: keyToUse,
+                    nonce: message.nonce
+                }, privateKey);
+            }
+        } catch (e) {
+            console.error('Decryption error for pinned message:', e);
+            return '🔒 [Ошибка расшифровки]';
+        }
+    }
+        
     // Показать/обновить плашку закреплённого сообщения
-    function updatePinnedMessageBar(pinnedMessage) {
+    function updatePinnedMessageBar(pinnedInfo) {
         const bar = document.getElementById('pinnedMessageBar');
         const contentSpan = document.getElementById('pinnedMessageContent');
         const unpinBtn = document.getElementById('unpinMessageBtn');
     
-        if (pinnedMessage) {
-            pinnedMessageId = pinnedMessage.id;
-            contentSpan.textContent = pinnedMessage.content || (pinnedMessage.type === 'image' ? '📷 Изображение' : '');
+        if (pinnedInfo) {
+            pinnedMessageId = pinnedInfo.id;
+            contentSpan.textContent = pinnedInfo.displayText || '';
             bar.style.display = 'flex';
-            
-            // Кнопка открепления: для личных чатов показываем всегда, для групп/каналов — только админам
+    
+            // Кнопка открепления: в личных чатах показываем всегда, в группах/каналах – админам
             if (currentChatType === 'direct') {
                 unpinBtn.style.display = 'block';
             } else {
@@ -2390,11 +2424,10 @@
         if (pinnedData.pinnedMessage) {
             // Преобразуем в формат, понятный updatePinnedMessageBar
             const msg = pinnedData.pinnedMessage;
+            const displayText = await getDecryptedMessageText(msg);
             updatePinnedMessageBar({
                 id: msg.id,
-                content: msg.content,
-                type: msg.type,
-                mediaData: msg.mediaData
+                displayText: displayText
             });
         }
         connectWebSocket(currentChatId, currentChatType);
@@ -2432,7 +2465,9 @@
         }
         // Отображаем закреплённое сообщение, если есть
         if (groupData.group.pinnedMessage) {
-            updatePinnedMessageBar(groupData.group.pinnedMessage);
+            const msg = groupData.group.pinnedMessage;
+            const displayText = await getDecryptedMessageText(msg);
+            updatePinnedMessageBar({ id: msg.id, displayText });
         } else {
             updatePinnedMessageBar(null);
         }
@@ -2469,7 +2504,9 @@
     
         const data = await api('/api/groups/' + channelId);
         if (data.group.pinnedMessage) {
-            updatePinnedMessageBar(data.group.pinnedMessage);
+            const msg = data.group.pinnedMessage;
+            const displayText = await getDecryptedMessageText(msg);
+            updatePinnedMessageBar({ id: msg.id, displayText });
         } else {
             updatePinnedMessageBar(null);
         }
@@ -2636,15 +2673,13 @@
             toast('Ошибка', data.error, 'error');
             return;
         }
-        // Обновляем плашку (нужно получить сообщение)
         const pinnedData = await api('/api/direct/pin?chatId=' + chatId);
         if (pinnedData.pinnedMessage) {
             const msg = pinnedData.pinnedMessage;
+            const displayText = await getDecryptedMessageText(msg);
             updatePinnedMessageBar({
                 id: msg.id,
-                content: msg.content,
-                type: msg.type,
-                mediaData: msg.mediaData
+                displayText: displayText
             });
         }
         toast('Успешно', 'Сообщение закреплено', 'success');
