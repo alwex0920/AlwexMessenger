@@ -369,6 +369,33 @@
             border-bottom-right-radius: 4px;
         }
 
+        .comment-btn {
+            position: absolute;
+            top: -8px;
+            right: 30px; /* рядом с кнопкой удаления */
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            padding: 0;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .message:hover .comment-btn {
+            display: flex;
+            opacity: 1;
+        }
+        .comment-btn:hover {
+            transform: scale(1.1);
+        }
+
         /* Адаптация плашки закреплённого сообщения */
         #pinnedMessageBar {
             display: flex;
@@ -1004,6 +1031,21 @@
             </div>
         </div>
     </div>
+    <div class="modal" id="commentsModal">
+        <div class="modal-box" style="max-width: 600px;">
+            <div class="modal-head">
+                <h2>Комментарии</h2>
+                <button class="icon-btn ripple" onclick="closeModal('commentsModal')">✖</button>
+            </div>
+            <div class="modal-body">
+                <div id="commentsList" style="max-height: 400px; overflow-y: auto; padding: 8px;"></div>
+                <div style="display: flex; gap: 8px; margin-top: 16px;">
+                    <textarea id="commentInput" placeholder="Ваш комментарий..." rows="2" style="flex:1; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px; color:var(--text);"></textarea>
+                    <button class="send-btn" onclick="sendComment()">➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <script>
     // ============================================
     // КРИПТОГРАФИЯ E2E - НОВЫЙ КОД
@@ -1344,6 +1386,105 @@
     let qrScanner = null;
     let currentTab = 'chats';
     let pinnedMessageId = null; // глобально или в области видимости чата
+    let currentPostId = null;
+
+    function openComments(postId, commentCount) {
+        currentPostId = postId;
+        document.getElementById('commentInput').value = '';
+        loadComments(postId);
+        showModal('commentsModal');
+    }
+    
+    async function loadComments(postId) {
+        const data = await api('/api/messages?group=' + currentChat.id + '&postId=' + postId);
+        const list = document.getElementById('commentsList');
+        list.innerHTML = '';
+        if (!data.messages || data.messages.length === 0) {
+            list.innerHTML = '<p style="text-align:center; color:var(--text2); padding:20px;">Нет комментариев</p>';
+            return;
+        }
+        data.messages.forEach(m => renderComment(m));
+    }
+    
+    function renderComment(m) {
+        const list = document.getElementById('commentsList');
+        const isOwn = m.senderId === user.id;
+        const div = document.createElement('div');
+        div.className = 'message' + (isOwn ? ' own' : '');
+        div.dataset.messageId = m.id;
+    
+        let content = '';
+        if (!isOwn) {
+            content += `<div class="msg-sender">${escapeHtml(m.senderName || 'User')}</div>`;
+        }
+        if (m.type === 'image' && m.mediaData) {
+            content += `<img class="msg-image" src="${escapeHtml(m.mediaData)}" onclick="viewImage(this.src)">`;
+        } else {
+            content += `<div class="msg-text">${escapeHtml(m.content || '')}</div>`;
+        }
+        content += `<div class="msg-time">${fmtTime(m.createdAt)}</div>`;
+    
+        div.innerHTML = `<div class="msg-bubble">${content}</div>`;
+        list.appendChild(div);
+    }
+    
+    async function sendComment() {
+        const input = document.getElementById('commentInput');
+        const content = input.value.trim();
+        if (!content || !currentPostId) return;
+    
+        const msgId = crypto.randomUUID();
+        const body = {
+            clientMessageId: msgId,
+            groupId: currentChat.id,
+            content,
+            type: 'text',
+            replyTo: currentPostId
+        };
+    
+        input.value = '';
+    
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            // Локально добавляем
+            const localMessage = {
+                id: msgId,
+                senderId: user.id,
+                senderName: user.displayName || user.username,
+                content,
+                type: 'text',
+                createdAt: Date.now()
+            };
+            renderComment(localMessage);
+            // Увеличиваем счётчик у поста
+            incrementCommentCount(currentPostId);
+    
+            ws.send(JSON.stringify({
+                type: 'message',
+                clientMessageId: msgId,
+                groupId: currentChat.id,
+                content,
+                replyTo: currentPostId
+            }));
+        } else {
+            const data = await api('/api/messages', { method: 'POST', body });
+            if (data.message) {
+                renderComment(data.message);
+                incrementCommentCount(currentPostId);
+            } else {
+                toast('Ошибка', data.error, 'error');
+            }
+        }
+    }
+    
+    function incrementCommentCount(postId) {
+        const postElement = document.querySelector(`.message[data-message-id="${postId}"]`);
+        if (!postElement) return;
+        const commentBtn = postElement.querySelector('.comment-btn');
+        if (!commentBtn) return;
+        const match = commentBtn.textContent.match(/\d+/);
+        const currentCount = match ? parseInt(match[0]) : 0;
+        commentBtn.textContent = `💬 ${currentCount + 1}`;
+    }
 
     async function getDecryptedMessageText(message) {
         // Если это изображение – сразу возвращаем иконку
@@ -2093,6 +2234,10 @@
                         console.error('Notification error:', e);
                     }
                 }
+                if (data.message.replyTo && data.message.replyTo === currentPostId) {
+                    renderComment(data.message);
+                    incrementCommentCount(data.message.replyTo);
+                }
                 // ---------------------------------
             } else if (data.type === 'delete') {
                 const msgDiv = document.querySelector('.message[data-message-id=' + data.messageId + ']');
@@ -2623,6 +2768,11 @@
         } else {
             console.log('Empty message', m.id);
             messageText = '';
+        }
+
+        if (currentChatType === 'channel' && !m.replyTo) {
+            const commentCount = m.commentCount || 0;
+            content += `<button class="comment-btn" onclick="openComments(${m.id}, ${commentCount})">💬 ${commentCount}</button>`;
         }
     
         if (m.type === 'image' && m.mediaData) {
