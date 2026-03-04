@@ -2367,7 +2367,9 @@
         disconnectWebSocket();
         currentChat = users[userId] || { id: userId };
         currentChatType = 'direct';
-        currentChatId = 'direct-' + userId;
+        const min = Math.min(user.id, userId);
+        const max = Math.max(user.id, userId);
+        currentChatId = `direct-${min}-${max}`;
         await ensureUserHasPublicKey(userId);
         setupChatUI();
         document.getElementById('chatName').textContent = currentChat.displayName || currentChat.username || 'User';
@@ -2618,7 +2620,9 @@
     }
 
     async function pinDirectMessage(messageId) {
-        const chatId = currentChatId.replace('direct-', '');
+        const min = Math.min(user.id, currentChat.id);
+        const max = Math.max(user.id, currentChat.id);
+        const chatId = `${min}-${max}`;
         const data = await api('/api/direct/pin', {
             method: 'POST',
             body: { chatId, messageId }
@@ -2642,7 +2646,9 @@
     }
     
     async function unpinDirectMessage() {
-        const chatId = currentChatId.replace('direct-', '');
+        const min = Math.min(user.id, currentChat.id);
+        const max = Math.max(user.id, currentChat.id);
+        const chatId = `${min}-${max}`;
         const data = await api('/api/direct/pin?chatId=' + chatId, { method: 'DELETE' });
         if (data.error) {
             toast('Ошибка', data.error, 'error');
