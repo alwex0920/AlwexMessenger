@@ -2985,10 +2985,13 @@
         } else {
             body.type = 'text';
             if (currentChatType === 'direct') {
+                // Убедимся, что у нас есть публичный ключ собеседника
+                if (!users[currentChat.id]?.publicKey) {
+                    await ensureUserHasPublicKey(currentChat.id);
+                }
                 const recipientPublicKey = users[currentChat.id]?.publicKey;
                 if (recipientPublicKey && privateKey) {
                     try {
-                        // Передаём свой публичный ключ для шифрования копии для себя
                         const encrypted = await CryptoHelper.encryptMessage(content, recipientPublicKey, user.publicKey);
                         body.encryptedContent = encrypted.encryptedContent;
                         body.encryptedKey = encrypted.encryptedKey;
@@ -3002,6 +3005,7 @@
                         return;
                     }
                 } else {
+                    // Если ключа нет (редкий случай), отправляем открытым текстом, но лучше не отправлять
                     body.content = content;
                 }
             } else if (currentChatType === 'group') {
@@ -3018,6 +3022,10 @@
                     }
                 } else {
                     body.content = content;
+                }
+                if (replyToId) {
+                    body.replyTo = replyToId;
+                    cancelReply();
                 }
             } else {
                 // Канал или другой тип – отправляем открытый текст
