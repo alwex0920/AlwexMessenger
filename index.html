@@ -2637,6 +2637,7 @@
         document.getElementById('chatAvatar').src = currentChat.avatar || '';
     
         const data = await api('/api/messages?with=' + userId);
+        console.log('Messages from server:', data.messages); 
         renderMessages(data.messages || []);
         // Загружаем закреплённое сообщение
         const chatId = [Math.min(user.id, userId), Math.max(user.id, userId)].join('-');
