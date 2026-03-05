@@ -396,6 +396,34 @@
             transform: scale(1.1);
         }
 
+        .reply-btn {
+            position: absolute;
+            top: -8px;
+            left: 60px; /* левее кнопки закрепления, если есть */
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 50%;
+            background: var(--accent2);
+            color: white;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            padding: 0;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 5;
+        }
+        .message:hover .reply-btn {
+            display: flex;
+            opacity: 1;
+        }
+        .reply-btn:hover {
+            transform: scale(1.1);
+        }
+
         /* Адаптация плашки закреплённого сообщения */
         #pinnedMessageBar {
             display: flex;
@@ -1387,6 +1415,8 @@
     let currentTab = 'chats';
     let pinnedMessageId = null; // глобально или в области видимости чата
     let currentPostId = null;
+    let replyToId = null;          // ID сообщения, на которое отвечаем
+    let replyToContent = '';       // текст для отображения в плашке
 
     function openComments(postId, commentCount) {
         console.log('Opening comments for post', postId, 'in group', currentChat.id);
@@ -1546,7 +1576,43 @@
             bar.style.display = 'none';
         }
     }
+
+    // Вызывается при клике на кнопку ответа
+    function replyToMessage(messageId, content, senderId) {
+        replyToId = messageId;
+        const senderName = users[senderId]?.displayName || users[senderId]?.username || 'Пользователь';
+        replyToContent = `${senderName}: ${content}`;
+        showReplyPreview(replyToContent);
+    }
     
+    // Показывает плашку с цитатой над полем ввода
+    function showReplyPreview(text) {
+        let replyPreview = document.getElementById('replyPreview');
+        if (!replyPreview) {
+            const inputArea = document.querySelector('.input-area');
+            replyPreview = document.createElement('div');
+            replyPreview.id = 'replyPreview';
+            replyPreview.style.cssText = 'padding:8px 16px; background:var(--bg3); border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; font-size:13px;';
+            replyPreview.innerHTML = `
+                <span style="color:var(--text2);">↩️</span>
+                <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text);"></span>
+                <button class="btn-text btn-sm" onclick="cancelReply()" style="color:var(--text2);">✖</button>
+            `;
+            // Вставляем перед полем ввода
+            inputArea.parentNode.insertBefore(replyPreview, inputArea);
+        }
+        replyPreview.querySelector('span:not(:first-child):not(:last-child)').textContent = text;
+        replyPreview.style.display = 'flex';
+    }
+    
+    // Отменяет ответ
+    function cancelReply() {
+        replyToId = null;
+        replyToContent = '';
+        const replyPreview = document.getElementById('replyPreview');
+        if (replyPreview) replyPreview.style.display = 'none';
+    }
+        
     // Закрепить сообщение
     async function pinMessage(messageId) {
         const data = await api('/api/messages/' + messageId + '/pin', { method: 'POST' });
@@ -2551,6 +2617,7 @@
 
     // ===== Чат =====
     async function openDirectChat(userId) {
+        cancelReply();
         updatePinnedMessageBar(null);
         disconnectWebSocket();
         currentChat = users[userId] || { id: userId };
@@ -2583,6 +2650,7 @@
     }
 
     async function openGroupChat(groupId) {
+        cancelReply();
         updatePinnedMessageBar(null);
         if (groups[groupId]?.type !== 'group') {
             console.warn('Not a group, opening as channel');
@@ -2644,6 +2712,7 @@
     }
 
     async function openChannel(channelId) {
+        cancelReply(); 
         updatePinnedMessageBar(null);
         disconnectWebSocket();
         currentChat = groups[channelId] || { id: channelId };
@@ -2721,6 +2790,10 @@
         let content = '';
         if (showSender && !isOwn) {
             content += `<div class="msg-sender">${escapeHtml(m.senderName || 'User')}</div>`;
+        }
+
+        if (m.replyTo) {
+            content += `<div class="reply-indicator" style="font-size:12px; color:var(--text2); margin-bottom:4px; padding-left:4px;">↩️ Ответ на сообщение</div>`;
         }
     
         let messageText = m.content;
@@ -2800,6 +2873,11 @@
         if (currentChatType === 'direct') {
             // Кнопка закрепления для личных чатов
             content += `<button class="pin-msg-btn" onclick="pinDirectMessage(${m.id})">📌</button>`;
+        }
+
+        if (currentChatType === 'direct' || currentChatType === 'group') {
+            // Кнопка ответа
+            content += `<button class="reply-btn" onclick="replyToMessage(${m.id}, '${escapeHtml(m.content || '')}', ${m.senderId})">↩️</button>`;
         }
     
         if (m.encryptedContent) {
@@ -2889,6 +2967,10 @@
     
         const msgId = crypto.randomUUID();
         const body = { clientMessageId: msgId };
+        if (replyToId) {
+            body.replyTo = replyToId;
+            cancelReply(); // сбрасываем плашку после отправки
+        }
     
         if (currentChatType === 'direct') {
             body.recipientId = currentChat.id;
