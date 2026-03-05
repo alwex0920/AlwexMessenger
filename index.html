@@ -2622,6 +2622,10 @@
         disconnectWebSocket();
         currentChat = users[userId] || { id: userId };
         currentChatType = 'direct';
+        if (userId === user.id) {
+            toast('Ошибка', 'Нельзя открыть чат с самим собой', 'error');
+            return;
+        }
         const min = Math.min(user.id, userId);
         const max = Math.max(user.id, userId);
         currentChatId = `direct-${min}-${max}`;
@@ -2976,6 +2980,11 @@
             body.recipientId = currentChat.id;
         } else {
             body.groupId = currentChat.id;
+        }
+
+        if (currentChatType === 'direct' && currentChat.id === user.id) {
+            toast('Ошибка', 'Нельзя отправить сообщение самому себе', 'error');
+            return;
         }
     
         if (pendingImage) {
