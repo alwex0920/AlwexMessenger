@@ -2306,7 +2306,7 @@
     
                 // ---------- УВЕДОМЛЕНИЯ ----------
                 // Показываем уведомление, если вкладка не активна и сообщение не от текущего пользователя
-                if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden && data.message.senderId !== user.id) {
+                if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
                     let title = '';
                     let body = '';
                 
