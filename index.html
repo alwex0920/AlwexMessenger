@@ -424,6 +424,20 @@
             transform: scale(1.1);
         }
 
+        .reply-quote {
+            background: var(--bg3);
+            padding: 4px 8px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            font-size: 13px;
+            color: var(--text2);
+            border-left: 3px solid var(--accent);
+            cursor: pointer;
+        }
+        .reply-quote:hover {
+            background: var(--bg4);
+        }
+
         /* Адаптация плашки закреплённого сообщения */
         #pinnedMessageBar {
             display: flex;
@@ -1417,7 +1431,21 @@
     let currentPostId = null;
     let replyToId = null;          // ID сообщения, на которое отвечаем
     let replyToContent = '';       // текст для отображения в плашке
+    let messagesById = {}; // словарь всех загруженных сообщений по id
 
+    function scrollToMessage(messageId) {
+        const msgElement = document.querySelector(`.message[data-message-id="${messageId}"]`);
+        if (msgElement) {
+            msgElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // подсветка
+            msgElement.style.transition = 'background 0.5s';
+            msgElement.style.background = 'rgba(99,102,241,0.3)';
+            setTimeout(() => msgElement.style.background = '', 1000);
+        } else {
+            toast('Ошибка', 'Сообщение не найдено', 'error');
+        }
+    }
+        
     function openComments(postId, commentCount) {
         console.log('Opening comments for post', postId, 'in group', currentChat.id);
         currentPostId = postId;
@@ -2262,6 +2290,7 @@
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === 'message') {
+                messagesById[data.message.id] = data.message;
                 addMessageToUI(data.message, currentChatType === 'group');
                 document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
 
@@ -2773,6 +2802,7 @@
         const container = document.getElementById('messages');
         container.innerHTML = '';
         messages.forEach(m => {
+            messagesById[m.id] = m;
             lastMsgId = Math.max(lastMsgId, m.id);
             addMessageToUI(m, showSender);
         });
@@ -2798,7 +2828,18 @@
         }
 
         if (m.replyTo) {
-            content += `<div class="reply-indicator" style="font-size:12px; color:var(--text2); margin-bottom:4px; padding-left:4px;">↩️ Ответ на сообщение</div>`;
+            const original = messagesById[m.replyTo];
+            if (original) {
+                const originalText = original.content || (original.type === 'image' ? '📷 Изображение' : '');
+                content += `
+                    <div class="reply-quote" onclick="scrollToMessage(${m.replyTo})" style="cursor:pointer;">
+                        <span style="color:var(--accent);">↩️ ${escapeHtml(original.senderName)}</span>
+                        <span style="margin-left:4px;">${escapeHtml(originalText)}</span>
+                    </div>
+                `;
+            } else {
+                content += `<div class="reply-quote" onclick="scrollToMessage(${m.replyTo})">↩️ Ответ на сообщение</div>`;
+            }
         }
     
         let messageText = m.content;
@@ -3140,6 +3181,7 @@
                 const wasAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
 
                 data.newMessages.forEach(m => {
+                    messagesById[m.id] = m;
                     lastMsgId = Math.max(lastMsgId, m.id);
                     addMessageToUI(m, currentChatType === 'group');
                 });
