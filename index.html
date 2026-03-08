@@ -3116,7 +3116,7 @@
                 encryptedKeyForSender: body.encryptedKeyForSender,
                 nonce: body.nonce,
                 mediaData: pendingImage,
-                replyTo: body.replyTo
+                replyTo: body.replyTo || null
             }));
     
             clearImagePreview();
