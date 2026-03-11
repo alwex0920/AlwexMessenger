@@ -631,6 +631,9 @@
             <div class="sidebar-head">
                 <h1>Alwex</h1>
                 <div style="display:flex;gap:8px">
+                    <button class="icon-btn ripple" onclick="showInstallModal()" title="Установить приложение">
+                        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    </button>
                     <button class="icon-btn ripple" onclick="showModal('newChatModal')" title="Новый чат">
                         <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                     </button>
@@ -1094,6 +1097,18 @@
             </div>
         </div>
     </div>
+    <!-- Install Modal -->
+    <div class="modal" id="installModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Установка приложения</h2>
+                <button class="icon-btn ripple" onclick="closeModal('installModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body" id="installContent">
+                <!-- Сюда подставится контент -->
+            </div>
+        </div>
+    </div>
     <script>
     // ============================================
     // КРИПТОГРАФИЯ E2E - НОВЫЙ КОД
@@ -1438,6 +1453,74 @@
     let replyToId = null;          // ID сообщения, на которое отвечаем
     let replyToContent = '';       // текст для отображения в плашке
     let messagesById = {}; // словарь всех загруженных сообщений по id
+
+    function getPlatform() {
+        const ua = navigator.userAgent.toLowerCase();
+        if (/iphone|ipad|ipod/.test(ua)) return 'ios';
+        if (/android/.test(ua)) return 'android';
+        if (/windows/.test(ua)) return 'windows';
+        if (/linux/.test(ua)) return 'linux';
+        return 'other';
+    }
+        
+    function showInstallModal() {
+        const platform = getPlatform();
+        const contentDiv = document.getElementById('installContent');
+        let html = '';
+    
+        if (platform === 'ios') {
+            html = `
+                <p style="margin-bottom:16px">Установите приложение на iPhone через профиль:</p>
+                <ol style="text-align:left; margin-bottom:20px">
+                    <li>Нажмите кнопку ниже, чтобы скачать профиль.</li>
+                    <li>Откройте <strong>Настройки → Профиль загружен</strong> и установите его.</li>
+                    <li>После установки на рабочем столе появится иконка приложения.</li>
+                </ol>
+                <a href="/api/ios-profile" class="btn btn-primary" style="width:auto; display:inline-block;">Скачать профиль</a>
+                <p style="margin-top:16px; font-size:12px; color:var(--text2)">Если профиль не устанавливается, перейдите в Настройки → Основные → VPN и управление устройством и доверьте профилю.</p>
+            `;
+        } else if (platform === 'android') {
+            html = `
+                <p style="margin-bottom:16px">Скачайте APK для Android:</p>
+                <ol style="text-align:left; margin-bottom:20px">
+                    <li>Нажмите кнопку ниже, чтобы скачать файл.</li>
+                    <li>Разрешите установку из неизвестных источников, если потребуется.</li>
+                    <li>Откройте скачанный APK и установите приложение.</li>
+                </ol>
+                <a href="https://disk.yandex.ru/d/ваша_ссылка_на_apk?dl=1" class="btn btn-primary" style="width:auto; display:inline-block;" download>Скачать APK</a>
+            `;
+        } else if (platform === 'windows') {
+            html = `
+                <p style="margin-bottom:16px">Скачайте установщик для Windows:</p>
+                <ol style="text-align:left; margin-bottom:20px">
+                    <li>Нажмите кнопку ниже, чтобы скачать .exe файл.</li>
+                    <li>Запустите скачанный файл и следуйте инструкциям установщика.</li>
+                </ol>
+                <a href="https://disk.yandex.ru/d/BNowwkAXsnISpA?dl=1" class="btn btn-primary" style="width:auto; display:inline-block;" download>Скачать для Windows</a>
+            `;
+        } else if (platform === 'linux') {
+            // Определяем, какая система (можно дополнительно анализировать, но для простоты покажем все варианты)
+            html = `
+                <p style="margin-bottom:16px">Выберите пакет для вашего дистрибутива Linux:</p>
+                <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:20px;">
+                    <a href="https://disk.yandex.ru/d/lfUH-D4_8mN8-w?dl=1" class="btn btn-secondary" download>.deb (Debian/Ubuntu)</a>
+                    <a href="https://disk.yandex.ru/d/M9TmgFZp4fV9Xw?dl=1" class="btn btn-secondary" download>AppImage (универсальный)</a>
+                </div>
+                <p><strong>Для AppImage:</strong> после скачивания сделайте файл исполняемым и запустите с флагом <code>--no-sandbox</code>:</p>
+                <pre style="background:var(--bg3); padding:8px; border-radius:6px; font-size:12px;">chmod +x AlwexMessenger.AppImage
+    ./AlwexMessenger.AppImage --no-sandbox</pre>
+                <p style="font-size:12px; color:var(--text2); margin-top:8px;">Если используете .deb, просто установите его через центр приложений или командой <code>sudo dpkg -i файл.deb</code>.</p>
+            `;
+        } else {
+            html = `
+                <p>Для этого устройства доступна установка через браузер.</p>
+                <p>Откройте меню браузера и выберите «Добавить на главный экран».</p>
+            `;
+        }
+    
+        contentDiv.innerHTML = html;
+        showModal('installModal');
+    }
 
     function scrollToMessage(messageId) {
         const msgElement = document.querySelector(`.message[data-message-id="${messageId}"]`);
