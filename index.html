@@ -1493,6 +1493,21 @@
     let replyToContent = '';       // текст для отображения в плашке
     let messagesById = {}; // словарь всех загруженных сообщений по id
 
+    function generateUUID() {
+        // Используем crypto.getRandomValues если доступен, иначе Math.random
+        const getRandomValues = (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto.getRandomValues.bind(crypto) : function(arr) {
+            for (let i = 0; i < arr.length; i++) {
+                arr[i] = Math.floor(Math.random() * 256);
+            }
+            return arr;
+        };
+        const buf = new Uint8Array(16);
+        getRandomValues(buf);
+        buf[6] = (buf[6] & 0x0f) | 0x40; // version 4
+        buf[8] = (buf[8] & 0x3f) | 0x80; // variant
+        return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
+    }
+
     // ============================================
     // ОБРАБОТКА НЕАВТОРИЗОВАННОГО ДОСТУПА (401)
     // ============================================
@@ -1808,7 +1823,7 @@
         const content = input.value.trim();
         if (!content || !currentPostId) return;
     
-        const msgId = crypto.randomUUID();
+        const msgId = generateUUID();
         const body = {
             clientMessageId: msgId,
             groupId: currentChat.id,
@@ -3324,7 +3339,7 @@
         if (!content && !pendingImage) return;
         if (!currentChat) return;
     
-        const msgId = crypto.randomUUID();
+        const msgId = generateUUID();
         const body = { clientMessageId: msgId };
         if (replyToId) {
             body.replyTo = replyToId;
