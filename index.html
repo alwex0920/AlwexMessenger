@@ -580,6 +580,9 @@
                 <div style="text-align:center; margin-top:12px;">
                     <button type="button" class="btn-text" onclick="showModal('importKeyModal')">🔑 Импортировать ключ с другого устройства</button>
                 </div>
+                <div style="text-align:center; margin-top:8px;">
+                    <button type="button" class="btn-text" onclick="showForgotPasswordModal()">Забыли пароль?</button>
+                </div>
             </form>
 
             <form class="form" id="registerForm" data-form="register">
@@ -602,7 +605,6 @@
                     <div class="gender-select">
                         <div class="gender-option" data-gender="male">👨 Муж</div>
                         <div class="gender-option" data-gender="female">👩 Жен</div>
-                        <div class="gender-option" data-gender="other">🧑 Другое</div>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary ripple" id="registerBtn"><span>Создать аккаунт</span></button>
@@ -1109,6 +1111,43 @@
             </div>
         </div>
     </div>
+    <!-- Forgot Password Modal -->
+    <div class="modal" id="forgotPasswordModal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2>Восстановление пароля</h2>
+                <button class="icon-btn ripple" onclick="closeModal('forgotPasswordModal')"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+            <div class="modal-body" id="forgotPasswordBody">
+                <!-- Step 1: request code -->
+                <div id="forgotStep1">
+                    <p style="margin-bottom:16px">Введите email, привязанный к аккаунту. Мы отправим код для сброса пароля.</p>
+                    <div class="field">
+                        <label>Email</label>
+                        <input type="email" id="forgotEmail" placeholder="you@example.com" required>
+                    </div>
+                    <button class="btn btn-primary" onclick="requestResetCode()">Отправить код</button>
+                </div>
+                <!-- Step 2: reset password -->
+                <div id="forgotStep2" style="display:none;">
+                    <p style="margin-bottom:16px">Введите код из письма и новый пароль.</p>
+                    <div class="field">
+                        <label>Код подтверждения</label>
+                        <input type="text" id="resetCode" maxlength="6" placeholder="123456" required>
+                    </div>
+                    <div class="field">
+                        <label>Новый пароль</label>
+                        <input type="password" id="newPassword" minlength="8" required>
+                    </div>
+                    <div class="field">
+                        <label>Подтверждение пароля</label>
+                        <input type="password" id="confirmPassword" minlength="8" required>
+                    </div>
+                    <button class="btn btn-primary" onclick="resetPassword()">Сбросить пароль</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <script>
     // ============================================
     // КРИПТОГРАФИЯ E2E - НОВЫЙ КОД
@@ -1453,6 +1492,191 @@
     let replyToId = null;          // ID сообщения, на которое отвечаем
     let replyToContent = '';       // текст для отображения в плашке
     let messagesById = {}; // словарь всех загруженных сообщений по id
+
+    // ============================================
+    // ОБРАБОТКА НЕАВТОРИЗОВАННОГО ДОСТУПА (401)
+    // ============================================
+    
+    // Флаги для предотвращения повторных вызовов
+    window.__handlingUnauthorized = false;
+    window.__unauthorized = false;
+    
+    async function handleUnauthorized() {
+        if (window.__handlingUnauthorized) return;
+        window.__handlingUnauthorized = true;
+    
+        const hasKey = localStorage.getItem('alwex_private_key_encrypted') && 
+                       localStorage.getItem('alwex_private_key_nonce');
+    
+        if (hasKey) {
+            window.__unauthorized = true;
+            exportKey(); // показываем модалку с ключом
+    
+            // Добавляем кнопку "Выйти сейчас" в футер модалки экспорта
+            const modalFooter = document.querySelector('#exportKeyModal .modal-footer');
+            if (modalFooter) {
+                let logoutBtn = document.getElementById('unauthorizedLogoutBtn');
+                if (!logoutBtn) {
+                    logoutBtn = document.createElement('button');
+                    logoutBtn.id = 'unauthorizedLogoutBtn';
+                    logoutBtn.className = 'btn btn-danger btn-sm';
+                    logoutBtn.textContent = 'Выйти сейчас';
+                    logoutBtn.onclick = () => {
+                        window.__unauthorized = false;
+                        logout(true);
+                    };
+                    modalFooter.appendChild(logoutBtn);
+                }
+            }
+        } else {
+            logout(true);
+        }
+    }
+    
+    // Модифицируем logout с параметром skipConfirm
+    const originalLogout = logout;
+    logout = async function(skipConfirm = false) {
+        if (!skipConfirm && !confirm('Выйти из аккаунта?')) return;
+        disconnectWebSocket();
+        await api('/api/logout', { method: 'POST' });
+        localStorage.removeItem('alwex_token');
+        localStorage.removeItem('alwex_user');
+        localStorage.removeItem('alwex_public_key');
+        sessionStorage.removeItem('alwex_private_key');
+        location.reload();
+    };
+    
+    // Переопределяем closeModal для выхода при закрытии модалки экспорта в состоянии unauthorized
+    const originalCloseModal = closeModal;
+    closeModal = function(id) {
+        originalCloseModal(id);
+        if (id === 'exportKeyModal' && window.__unauthorized) {
+            window.__unauthorized = false;
+            logout(true);
+        }
+    };
+    
+    // Переопределяем api с обработкой 401
+    const originalApi = api;
+    api = async function(path, opts = {}) {
+        const headers = { 'Content-Type': 'application/json', 'X-Device-Fingerprint': getFP() };
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+    
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+    
+        try {
+            const res = await fetch(API + path, {
+                ...opts,
+                headers: { ...headers, ...opts.headers },
+                body: opts.body ? JSON.stringify(opts.body) : null,
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+    
+            if (res.status === 401) {
+                handleUnauthorized();
+                return { error: 'Unauthorized' };
+            }
+    
+            return res.json();
+        } catch (e) {
+            clearTimeout(timeoutId);
+            if (e.name === 'AbortError') {
+                toast('Ошибка', 'Превышено время ожидания. Проверьте соединение.', 'error');
+                return { error: 'Timeout' };
+            }
+            toast('Ошибка сети', 'Не удалось связаться с сервером', 'error');
+            return { error: 'Network error' };
+        }
+    };
+    
+    // ============================================
+    // ВОССТАНОВЛЕНИЕ ПАРОЛЯ (без реальной отправки email)
+    // ============================================
+    
+    function showForgotPasswordModal() {
+        document.getElementById('forgotStep1').style.display = 'block';
+        document.getElementById('forgotStep2').style.display = 'none';
+        document.getElementById('forgotEmail').value = '';
+        document.getElementById('resetCode').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+        showModal('forgotPasswordModal');
+    }
+    
+    async function requestResetCode() {
+        const email = document.getElementById('forgotEmail').value.trim();
+        if (!email) {
+            toast('Ошибка', 'Введите email', 'error');
+            return;
+        }
+    
+        const btn = event.target;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+    
+        const data = await api('/api/forgot-password', {
+            method: 'POST',
+            body: { email }
+        });
+    
+        btn.disabled = false;
+        btn.innerHTML = 'Отправить код';
+    
+        if (data.error) {
+            toast('Ошибка', data.error, 'error');
+            return;
+        }
+    
+        // Для отладки показываем код (позже убрать)
+        if (data._debugCode) {
+            toast('Код для отладки', data._debugCode, 'info');
+        }
+    
+        document.getElementById('forgotStep1').style.display = 'none';
+        document.getElementById('forgotStep2').style.display = 'block';
+    }
+    
+    async function resetPassword() {
+        const email = document.getElementById('forgotEmail').value.trim();
+        const code = document.getElementById('resetCode').value.trim();
+        const newPass = document.getElementById('newPassword').value;
+        const confirmPass = document.getElementById('confirmPassword').value;
+    
+        if (!email || !code || !newPass || !confirmPass) {
+            toast('Ошибка', 'Заполните все поля', 'error');
+            return;
+        }
+        if (newPass.length < 8) {
+            toast('Ошибка', 'Пароль должен быть минимум 8 символов', 'error');
+            return;
+        }
+        if (newPass !== confirmPass) {
+            toast('Ошибка', 'Пароли не совпадают', 'error');
+            return;
+        }
+    
+        const btn = event.target;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+    
+        const data = await api('/api/reset-password', {
+            method: 'POST',
+            body: { email, code, newPassword: newPass }
+        });
+    
+        btn.disabled = false;
+        btn.innerHTML = 'Сбросить пароль';
+    
+        if (data.error) {
+            toast('Ошибка', data.error, 'error');
+            return;
+        }
+    
+        toast('Успех', 'Пароль изменён. Теперь вы можете войти.', 'success');
+        closeModal('forgotPasswordModal');
+    }
 
     function getPlatform() {
         const ua = navigator.userAgent.toLowerCase();
