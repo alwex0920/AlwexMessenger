@@ -4012,8 +4012,10 @@
     };
 
     // Init user search
-    searchUsers('');
-    searchUsersForGroup('');
+    if (token && user) {
+        searchUsers('');
+        searchUsersForGroup('');
+    }
     </script>
 </body>
 </html>
