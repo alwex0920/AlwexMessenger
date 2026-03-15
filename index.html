@@ -2219,6 +2219,7 @@
     }
     
     async function searchUsersForAddMember(search) {
+        if (!token || !user) return; // неавторизованным нельзя
         const data = await api('/api/users?search=' + encodeURIComponent(search));
         const list = document.getElementById('addMemberUserList');
         list.innerHTML = '';
@@ -3521,6 +3522,7 @@
 
     // ===== Пользователи =====
     async function searchUsers(search) {
+        if (!token || !user) return; // неавторизованным нельзя
         const data = await api('/api/users?search=' + encodeURIComponent(search));
         const list = document.getElementById('userList');
         list.innerHTML = '';
@@ -3553,6 +3555,7 @@
     selectedGroupMembers = [];
 
     async function searchUsersForGroup(search) {
+        if (!token || !user) return; // неавторизованным нельзя
         const data = await api('/api/users?search=' + encodeURIComponent(search));
         const list = document.getElementById('groupUserList');
         list.innerHTML = '';
