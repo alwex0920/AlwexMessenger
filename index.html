@@ -2777,8 +2777,6 @@
         sessionStorage.setItem('alwex_private_key', privateKey);
         
         if (data.verificationRequired) {
-            document.getElementById('authSuccess').innerHTML = 'Код подтверждения: <strong>' + data._demoCode + '</strong>';
-            document.getElementById('authSuccess').classList.add('show');
             document.getElementById('verifyEmail').textContent = user.email;
             document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
             document.querySelectorAll('.form').forEach(x => x.classList.remove('active'));
