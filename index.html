@@ -2809,8 +2809,44 @@
     
         if (data.twoFactorRequired) {
             document.getElementById('tfaField').style.display = 'block';
+            const label = document.querySelector('#tfaField label');
+            if (data.method === 'email') {
+                label.textContent = 'Код из email';
+                // Добавляем кнопку повторной отправки, если её нет
+                let resendBtn = document.getElementById('resendCodeBtn');
+                if (!resendBtn) {
+                    resendBtn = document.createElement('button');
+                    resendBtn.id = 'resendCodeBtn';
+                    resendBtn.type = 'button';
+                    resendBtn.className = 'btn-text';
+                    resendBtn.textContent = 'Отправить код повторно';
+                    resendBtn.onclick = async () => {
+                        const resendData = await api('/api/login/resend-code', {
+                            method: 'POST',
+                            body: {
+                                username: document.getElementById('loginUser').value,
+                                password: document.getElementById('loginPass').value
+                            }
+                        });
+                        if (resendData.error) {
+                            toast('Ошибка', resendData.error, 'error');
+                        } else {
+                            toast('Успех', 'Код отправлен повторно', 'success');
+                            if (resendData._debugCode) {
+                                toast('Код для отладки', resendData._debugCode, 'info');
+                            }
+                        }
+                    };
+                    document.getElementById('tfaField').appendChild(resendBtn);
+                }
+            } else {
+                label.textContent = 'Код 2FA';
+                // Удаляем кнопку повторной отправки, если есть
+                const oldBtn = document.getElementById('resendCodeBtn');
+                if (oldBtn) oldBtn.remove();
+            }
             document.getElementById('tfaCode').focus();
-            toast('Требуется 2FA', 'Введите код из приложения', 'info');
+            toast('Требуется 2FA', data.method === 'email' ? 'Введите код из письма' : 'Введите код 2FA', 'info');
             return;
         }
         if (data.error) {
