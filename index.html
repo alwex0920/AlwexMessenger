@@ -3379,6 +3379,8 @@
             }
         } else if (m.type === 'file' && m.mediaData) {
             content += `<a href="/api/files/${escapeHtml(m.mediaData)}" class="file-link" target="_blank">📎 Скачать файл</a>`;
+        } else {
+            content += `<div class="msg-text">${escapeHtml(messageText)}</div>`;
         }
         content += `<div class="msg-time">${fmtTime(m.createdAt)}</div>`;
     
