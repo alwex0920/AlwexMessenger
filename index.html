@@ -695,9 +695,13 @@
                         <button class="icon-btn small ripple" onclick="document.getElementById('imageInput').click()" title="Отправить фото">
                             <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
                         </button>
+                        <button class="icon-btn small ripple" onclick="document.getElementById('fileInput').click()" title="Отправить файл">
+                            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                        </button>
                     </div>
                     <textarea id="msgInput" placeholder="Сообщение..." rows="1"></textarea>
                     <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="previewImage(this)">
+                    <input type="file" id="fileInput" style="display:none" onchange="uploadFile(this)">
                 </div>
                 <button class="send-btn ripple" id="sendBtn" onclick="sendMsg()">
                     <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -1493,6 +1497,99 @@
     let replyToContent = '';       // текст для отображения в плашке
     let messagesById = {}; // словарь всех загруженных сообщений по id
 
+    async function uploadFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        if (file.size > 15 * 1024 * 1024) {
+            toast('Ошибка', 'Файл слишком большой (макс. 15 МБ)', 'error');
+            return;
+        }
+        if (!currentChat) {
+            toast('Ошибка', 'Не выбран чат', 'error');
+            return;
+        }
+        const btn = event.target;
+        btn.disabled = true;
+        try {
+            // 1. Получаем signed URL для загрузки
+            const { uploadUrl, fileId } = await api('/api/upload-url', {
+                method: 'POST',
+                body: {
+                    fileName: file.name,
+                    fileType: file.type,
+                    chatId: currentChat.id
+                }
+            });
+            // 2. Загружаем файл напрямую в Supabase
+            const uploadRes = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: file,
+                headers: { 'Content-Type': file.type }
+            });
+            if (!uploadRes.ok) throw new Error('Upload failed');
+            // 3. Подтверждаем загрузку
+            await api('/api/upload-complete', {
+                method: 'POST',
+                body: { fileId, size: file.size }
+            });
+            // 4. Отправляем сообщение с типом 'file'
+            const msgId = generateUUID();
+            const body = {
+                clientMessageId: msgId,
+                type: 'file',
+                mediaData: fileId,
+                content: ''
+            };
+            if (currentChatType === 'direct') {
+                body.recipientId = currentChat.id;
+            } else {
+                body.groupId = currentChat.id;
+            }
+            // Отправка через WebSocket или HTTP
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'message',
+                    clientMessageId: msgId,
+                    recipientId: body.recipientId,
+                    groupId: body.groupId,
+                    content: '',
+                    encryptedContent: null,
+                    encryptedKey: null,
+                    encryptedKeyForSender: null,
+                    nonce: null,
+                    mediaData: fileId,
+                    type: 'file'
+                }));
+                // Локальное добавление
+                const localMessage = {
+                    id: msgId,
+                    senderId: user.id,
+                    content: '',
+                    type: 'file',
+                    mediaData: fileId,
+                    createdAt: Date.now()
+                };
+                addMessageToUI(localMessage, currentChatType === 'group');
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            } else {
+                const data = await api('/api/messages', { method: 'POST', body });
+                if (data.message) {
+                    addMessageToUI({ ...data.message, senderId: user.id }, currentChatType === 'group');
+                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+                    await loadChats();
+                } else {
+                    toast('Ошибка', data.error || 'Не удалось отправить файл', 'error');
+                }
+            }
+            input.value = '';
+        } catch (err) {
+            console.error(err);
+            toast('Ошибка', 'Не удалось отправить файл', 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+        
     function generateUUID() {
         // Используем crypto.getRandomValues если доступен, иначе Math.random
         const getRandomValues = (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto.getRandomValues.bind(crypto) : function(arr) {
@@ -3266,8 +3363,9 @@
     
         if (m.type === 'image' && m.mediaData) {
             content += `<img class="msg-image" src="${escapeHtml(m.mediaData)}" onclick="viewImage(this.src)">`;
-        } else {
-            content += `<div class="msg-text">${escapeHtml(messageText || '')}</div>`;
+        }
+        if (m.type === 'file' && m.mediaData) {
+            content += `<a href="/api/files/${m.mediaData}" class="file-link" target="_blank">📎 Скачать файл</a>`;
         }
         content += `<div class="msg-time">${fmtTime(m.createdAt)}</div>`;
     
