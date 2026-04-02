@@ -692,7 +692,7 @@
             <div class="input-area" id="inputArea" style="display:none">
                 <div class="input-wrap">
                     <div class="input-actions">
-                        <button class="icon-btn small ripple" onclick="document.getElementById('imageInput').click()" title="Отправить фото">
+                        <button class="icon-btn small ripple" onclick="document.getElementById('fileInput').click()" title="Отправить фото">
                             <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
                         </button>
                         <button class="icon-btn small ripple" onclick="document.getElementById('fileInput').click()" title="Отправить файл">
@@ -700,7 +700,6 @@
                         </button>
                     </div>
                     <textarea id="msgInput" placeholder="Сообщение..." rows="1"></textarea>
-                    <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="previewImage(this)">
                     <input type="file" id="fileInput" style="display:none" onchange="uploadFile(this)">
                 </div>
                 <button class="send-btn ripple" id="sendBtn" onclick="sendMsg()">
@@ -1497,6 +1496,7 @@
     let replyToContent = '';       // текст для отображения в плашке
     let messagesById = {}; // словарь всех загруженных сообщений по id
 
+    // Новая функция для отправки любого файла (изображения, документы, видео)
     async function uploadFile(input) {
         const file = input.files[0];
         if (!file) return;
@@ -1511,6 +1511,10 @@
         const btn = event.target;
         btn.disabled = true;
         try {
+            // Определяем тип сообщения
+            const isImage = file.type.startsWith('image/');
+            const msgType = isImage ? 'image' : 'file';
+            
             // 1. Получаем signed URL для загрузки
             const { uploadUrl, fileId } = await api('/api/upload-url', {
                 method: 'POST',
@@ -1520,6 +1524,7 @@
                     chatId: currentChat.id
                 }
             });
+            
             // 2. Загружаем файл напрямую в Supabase
             const uploadRes = await fetch(uploadUrl, {
                 method: 'PUT',
@@ -1527,17 +1532,19 @@
                 headers: { 'Content-Type': file.type }
             });
             if (!uploadRes.ok) throw new Error('Upload failed');
+            
             // 3. Подтверждаем загрузку
             await api('/api/upload-complete', {
                 method: 'POST',
                 body: { fileId, size: file.size }
             });
-            // 4. Отправляем сообщение с типом 'file'
+            
+            // 4. Отправляем сообщение
             const msgId = generateUUID();
             const body = {
                 clientMessageId: msgId,
-                type: 'file',
-                mediaData: fileId,
+                type: msgType,
+                mediaData: fileId, // сохраняем ID файла
                 content: ''
             };
             if (currentChatType === 'direct') {
@@ -1545,6 +1552,7 @@
             } else {
                 body.groupId = currentChat.id;
             }
+            
             // Отправка через WebSocket или HTTP
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
@@ -1558,14 +1566,14 @@
                     encryptedKeyForSender: null,
                     nonce: null,
                     mediaData: fileId,
-                    type: 'file'
+                    type: msgType
                 }));
                 // Локальное добавление
                 const localMessage = {
                     id: msgId,
                     senderId: user.id,
                     content: '',
-                    type: 'file',
+                    type: msgType,
                     mediaData: fileId,
                     createdAt: Date.now()
                 };
@@ -3362,10 +3370,15 @@
         }
     
         if (m.type === 'image' && m.mediaData) {
-            content += `<img class="msg-image" src="${escapeHtml(m.mediaData)}" onclick="viewImage(this.src)">`;
-        }
-        if (m.type === 'file' && m.mediaData) {
-            content += `<a href="/api/files/${m.mediaData}" class="file-link" target="_blank">📎 Скачать файл</a>`;
+            // Старый формат: base64 начинается с 'data:image/'
+            if (typeof m.mediaData === 'string' && m.mediaData.startsWith('data:image/')) {
+                content += `<img class="msg-image" src="${escapeHtml(m.mediaData)}" onclick="viewImage(this.src)">`;
+            } else {
+                // Новый формат: fileId
+                content += `<img class="msg-image" src="/api/files/${escapeHtml(m.mediaData)}" onclick="viewImage(this.src)">`;
+            }
+        } else if (m.type === 'file' && m.mediaData) {
+            content += `<a href="/api/files/${escapeHtml(m.mediaData)}" class="file-link" target="_blank">📎 Скачать файл</a>`;
         }
         content += `<div class="msg-time">${fmtTime(m.createdAt)}</div>`;
     
