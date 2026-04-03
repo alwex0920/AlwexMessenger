@@ -3383,14 +3383,15 @@
             const commentCount = m.commentCount || 0;
             content += `<button class="comment-btn" onclick="openComments(${m.id}, ${commentCount})">💬 ${commentCount}</button>`;
         }
-    
+
+        const fileUrl = `/api/files/${escapeHtml(m.mediaData)}?token=${encodeURIComponent(token)}`;        
         if (m.type === 'image' && m.mediaData) {
             // Старый формат: base64 начинается с 'data:image/'
             if (typeof m.mediaData === 'string' && m.mediaData.startsWith('data:image/')) {
                 content += `<img class="msg-image" src="${escapeHtml(m.mediaData)}" onclick="viewImage(this.src)">`;
             } else {
                 // Новый формат: fileId
-                content += `<img class="msg-image" src="/api/files/${escapeHtml(m.mediaData)}" onclick="viewImage(this.src)">`;
+                content += `<img class="msg-image" src="${fileUrl}" onclick="viewImage(this.src)">`;
             }
         } else if (m.type === 'file' && m.mediaData) {
             content += `<a href="/api/files/${escapeHtml(m.mediaData)}" class="file-link" target="_blank">📎 Скачать файл</a>`;
