@@ -1538,10 +1538,18 @@
             toast('Ошибка', 'Не выбран чат', 'error');
             return;
         }
-    
+        
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('chatId', currentChat.id);
+        let formattedChatId;
+        if (currentChatType === 'direct') {
+            const min = Math.min(user.id, currentChat.id);
+            const max = Math.max(user.id, currentChat.id);
+            formattedChatId = `direct-${min}-${max}`;
+        } else {
+            formattedChatId = `${currentChatType}-${currentChat.id}`;
+        }
+        formData.append('chatId', formattedChatId);
         formData.append('type', file.type.startsWith('image/') ? 'image' : 'file');
     
         const res = await fetch('/api/upload', {
