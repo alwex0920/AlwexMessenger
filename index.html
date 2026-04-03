@@ -1496,6 +1496,36 @@
     let replyToContent = '';       // текст для отображения в плашке
     let messagesById = {}; // словарь всех загруженных сообщений по id
 
+    document.addEventListener('click', async (e) => {
+        const link = e.target.closest('.file-link');
+        if (!link) return;
+        e.preventDefault();
+        const url = link.getAttribute('href');
+        if (!url) return;
+    
+        try {
+            const res = await fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!res.ok) throw new Error('Download failed');
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            // Извлекаем имя файла из текста ссылки или из URL
+            let filename = link.textContent.replace('📎 Скачать файл', '').trim();
+            if (!filename) filename = 'file';
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error(err);
+            toast('Ошибка', 'Не удалось скачать файл', 'error');
+        }
+    });
+
     // Новая функция для отправки любого файла (изображения, документы, видео)
     async function uploadFile(input) {
         const file = input.files[0];
