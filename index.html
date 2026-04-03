@@ -1538,6 +1538,8 @@
             toast('Ошибка', 'Не выбран чат', 'error');
             return;
         }
+
+        toast('Информация', 'Файл загружается', 'info');
         
         const formData = new FormData();
         formData.append('file', file);
