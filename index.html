@@ -1508,94 +1508,69 @@
             toast('Ошибка', 'Не выбран чат', 'error');
             return;
         }
-        const btn = event.target;
-        btn.disabled = true;
-        try {
-            // Определяем тип сообщения
-            const isImage = file.type.startsWith('image/');
-            const msgType = isImage ? 'image' : 'file';
-            
-            // 1. Получаем signed URL для загрузки
-            const { uploadUrl, fileId } = await api('/api/upload-url', {
-                method: 'POST',
-                body: {
-                    fileName: file.name,
-                    fileType: file.type,
-                    chatId: currentChat.id
-                }
-            });
-            
-            // 2. Загружаем файл напрямую в Supabase
-            const uploadRes = await fetch(uploadUrl, {
-                method: 'PUT',
-                body: file,
-                headers: { 'Content-Type': file.type }
-            });
-            if (!uploadRes.ok) throw new Error('Upload failed');
-            
-            // 3. Подтверждаем загрузку
-            await api('/api/upload-complete', {
-                method: 'POST',
-                body: { fileId, size: file.size }
-            });
-            
-            // 4. Отправляем сообщение
-            const msgId = generateUUID();
-            const body = {
-                clientMessageId: msgId,
-                type: msgType,
-                mediaData: fileId, // сохраняем ID файла
-                content: ''
-            };
-            if (currentChatType === 'direct') {
-                body.recipientId = currentChat.id;
-            } else {
-                body.groupId = currentChat.id;
-            }
-            
-            // Отправка через WebSocket или HTTP
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'message',
-                    clientMessageId: msgId,
-                    recipientId: body.recipientId,
-                    groupId: body.groupId,
-                    content: '',
-                    encryptedContent: null,
-                    encryptedKey: null,
-                    encryptedKeyForSender: null,
-                    nonce: null,
-                    mediaData: fileId,
-                    type: msgType
-                }));
-                // Локальное добавление
-                const localMessage = {
-                    id: msgId,
-                    senderId: user.id,
-                    content: '',
-                    type: msgType,
-                    mediaData: fileId,
-                    createdAt: Date.now()
-                };
-                addMessageToUI(localMessage, currentChatType === 'group');
-                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-            } else {
-                const data = await api('/api/messages', { method: 'POST', body });
-                if (data.message) {
-                    addMessageToUI({ ...data.message, senderId: user.id }, currentChatType === 'group');
-                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-                    await loadChats();
-                } else {
-                    toast('Ошибка', data.error || 'Не удалось отправить файл', 'error');
-                }
-            }
-            input.value = '';
-        } catch (err) {
-            console.error(err);
-            toast('Ошибка', 'Не удалось отправить файл', 'error');
-        } finally {
-            btn.disabled = false;
+    
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('chatId', currentChat.id);
+        formData.append('type', file.type.startsWith('image/') ? 'image' : 'file');
+    
+        const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token },
+            body: formData
+        });
+    
+        const data = await res.json();
+        if (data.error) {
+            toast('Ошибка', data.error, 'error');
+            return;
         }
+    
+        // Отправляем сообщение с fileId
+        const msgId = generateUUID();
+        const body = {
+            clientMessageId: msgId,
+            type: data.type,
+            mediaData: data.fileId,
+            content: ''
+        };
+        if (currentChatType === 'direct') {
+            body.recipientId = currentChat.id;
+        } else {
+            body.groupId = currentChat.id;
+        }
+    
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'message',
+                clientMessageId: msgId,
+                recipientId: body.recipientId,
+                groupId: body.groupId,
+                content: '',
+                mediaData: data.fileId,
+                type: data.type
+            }));
+            const localMessage = {
+                id: msgId,
+                senderId: user.id,
+                content: '',
+                type: data.type,
+                mediaData: data.fileId,
+                createdAt: Date.now()
+            };
+            addMessageToUI(localMessage, currentChatType === 'group');
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        } else {
+            const apiRes = await api('/api/messages', { method: 'POST', body });
+            if (apiRes.message) {
+                addMessageToUI({ ...apiRes.message, senderId: user.id }, currentChatType === 'group');
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+                await loadChats();
+            } else {
+                toast('Ошибка', apiRes.error || 'Не удалось отправить файл', 'error');
+            }
+        }
+        input.value = '';
     }
         
     function generateUUID() {
