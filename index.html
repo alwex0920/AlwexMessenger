@@ -3153,7 +3153,7 @@
     
         const data = await api('/api/messages?with=' + userId);
         console.log('Messages from server:', data.messages); 
-        renderMessages(data.messages || []);
+        await renderMessages(data.messages || []);
         // Загружаем закреплённое сообщение
         const chatId = [Math.min(user.id, userId), Math.max(user.id, userId)].join('-');
         const pinnedData = await api('/api/direct/pin?chatId=' + chatId);
@@ -3227,7 +3227,7 @@
         }
     
         const msgsData = await api('/api/messages?group=' + groupId);
-        renderMessages(msgsData.messages || [], true);
+        await renderMessages(msgsData.messages || [], true);
         connectWebSocket(currentChatId, currentChatType);
     }
 
@@ -3268,7 +3268,7 @@
         // --- ЗАГРУЗКА СООБЩЕНИЙ ---
         const msgsData = await api('/api/messages?group=' + channelId);
         console.log('Messages from server for channel', channelId, msgsData.messages); // ЛОГ
-        renderMessages(msgsData.messages || [], true);
+        await renderMessages(msgsData.messages || [], true);
         // --------------------------
     
         connectWebSocket(currentChatId, currentChatType);
@@ -3284,14 +3284,14 @@
         lastMsgId = 0;
     }
 
-    function renderMessages(messages, showSender = false) {
+    async function renderMessages(messages, showSender = false) {
         const container = document.getElementById('messages');
         container.innerHTML = '';
-        messages.forEach(m => {
+        for (const m of messages) {
             messagesById[m.id] = m;
             lastMsgId = Math.max(lastMsgId, m.id);
-            addMessageToUI(m, showSender);
-        });
+            await addMessageToUI(m, showSender);
+        }
         container.scrollTop = container.scrollHeight;
     }
 
