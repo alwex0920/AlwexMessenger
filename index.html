@@ -3394,7 +3394,9 @@
                 content += `<img class="msg-image" src="${fileUrl}" onclick="viewImage(this.src)">`;
             }
         } else if (m.type === 'file' && m.mediaData) {
-            content += `<a href="${fileUrl}" class="file-link" target="_blank">📎 Скачать файл</a>`;
+            const fileName = m.fileName || 'Файл';
+            const fileSize = m.fileSize ? ` (${(m.fileSize / 1024).toFixed(1)} KB)` : '';
+            content += `<a href="/api/files/${escapeHtml(m.mediaData)}" class="file-link" target="_blank">📎 ${escapeHtml(fileName)}${fileSize}</a>`;
         } else {
             content += `<div class="msg-text">${escapeHtml(messageText)}</div>`;
         }
