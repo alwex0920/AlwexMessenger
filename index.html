@@ -3397,7 +3397,7 @@
             const fileName = m.fileName || 'Файл';
             const fileSize = m.fileSize ? ` (${(m.fileSize / 1024).toFixed(1)} KB)` : '';
             // Ссылка должна вести на файл, а текст ссылки – только имя файла (без эмодзи и размера)
-            content += `<a href="/api/files/${escapeHtml(m.mediaData)}" class="file-link" target="_blank">📎 ${escapeHtml(fileName)}</a>`;
+            content += `<a href="/api/files/${escapeHtml(m.mediaData)}" class="file-link" target="_blank">${escapeHtml(fileName)}</a>`;
             // Размер можно добавить отдельным текстом после ссылки
             if (fileSize) {
                 content += `<span class="file-size" style="color:var(--text2); margin-left:4px;">${fileSize}</span>`;
