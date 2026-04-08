@@ -1537,16 +1537,71 @@
         }
         return outputArray;
     }
+
+    // Регистрация Service Worker через Blob (обход проблемы с MIME)
+    async function registerServiceWorker() {
+        const swCode = `
+            self.addEventListener('push', event => {
+                if (!event.data) return;
+                let data;
+                try {
+                    data = event.data.json();
+                } catch (e) {
+                    data = { title: 'Новое сообщение', body: event.data.text() };
+                }
+                const options = {
+                    body: data.body || '',
+                    icon: data.icon || '/favicon.ico',
+                    badge: '/favicon.ico',
+                    vibrate: [200, 100, 200],
+                    requireInteraction: true,
+                    data: data.data || {}
+                };
+                event.waitUntil(
+                    self.registration.showNotification(data.title || 'AlwexMessenger', options)
+                );
+            });
     
+            self.addEventListener('notificationclick', event => {
+                event.notification.close();
+                const urlToOpen = event.notification.data?.chatId 
+                    ? \`/?chat=\${event.notification.data.chatId}\` 
+                    : '/';
+                event.waitUntil(
+                    clients.matchAll({ type: 'window', includeUncontrolled: true })
+                        .then(clients => {
+                            for (let client of clients) {
+                                if (client.url === urlToOpen && 'focus' in client) {
+                                    return client.focus();
+                                }
+                            }
+                            if (clients.openWindow) return clients.openWindow(urlToOpen);
+                        })
+                );
+            });
+        `;
+        
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+        try {
+            const registration = await navigator.serviceWorker.register(blobUrl);
+            console.log('Service Worker registered via Blob', registration);
+            URL.revokeObjectURL(blobUrl);
+            return registration;
+        } catch (err) {
+            console.error('Service Worker registration failed', err);
+            throw err;
+        }
+    }
+        
     // Регистрация Service Worker и подписка на push
     async function subscribeToPush() {
         if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-            console.warn('Push notifications not supported');
+            console.warn('Push not supported');
             toast('Уведомления', 'Ваш браузер не поддерживает push-уведомления', 'info');
             return;
         }
     
-        // Запрашиваем разрешение
         if (Notification.permission !== 'granted') {
             const result = await Notification.requestPermission();
             if (result !== 'granted') {
@@ -1555,19 +1610,20 @@
             }
         }
     
-        // Регистрируем Service Worker
+        // Регистрируем SW через Blob
         let registration;
-        if (navigator.serviceWorker.controller) {
-            registration = await navigator.serviceWorker.ready;
-        } else {
-            registration = await navigator.serviceWorker.register('/sw.js');
-            await navigator.serviceWorker.ready;
+        try {
+            registration = await registerServiceWorker();
+        } catch (err) {
+            console.error('Failed to register SW', err);
+            toast('Ошибка', 'Не удалось зарегистрировать Service Worker', 'error');
+            return;
         }
     
-        // Получаем существующую подписку или создаём новую
+        // Получаем подписку
         let subscription = await registration.pushManager.getSubscription();
         if (!subscription) {
-            const publicKey = 'BNs9jjTGerRZIb1Oeok_ERtSdgr2fMqVnp2v_7A6qGuSgFliGucmqG9vq9VJYpsK2IaeAdbZ7Tm9IXE12X14Eg8'; // Ваш VAPID публичный ключ
+            const publicKey = 'BNs9jjTGerRZIb1Oeok_ERtSdgr2fMqVnp2v_7A6qGuSgFliGucmqG9vq9VJYpsK2IaeAdbZ7Tm9IXE12X14Eg8'; // ваш публичный ключ
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(publicKey)
@@ -1577,10 +1633,7 @@
         // Отправляем подписку на сервер
         const response = await fetch('/api/push/subscribe', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             body: JSON.stringify({
                 endpoint: subscription.endpoint,
                 keys: subscription.toJSON().keys
