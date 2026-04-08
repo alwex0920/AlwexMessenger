@@ -1566,20 +1566,29 @@
             }
         }
     
-        // Регистрируем SW через Blob
-        let registration;
-        try {
-            registration = await registerServiceWorker();
-        } catch (err) {
-            console.error('Failed to register SW', err);
-            toast('Ошибка', 'Не удалось зарегистрировать Service Worker', 'error');
-            return;
+        // Регистрируем Service Worker
+        const registration = await navigator.serviceWorker.register('/sw.js');
+        console.log('Service Worker registered', registration);
+    
+        // Дожидаемся активации
+        if (registration.active) {
+            console.log('Service Worker already active');
+        } else {
+            await new Promise(resolve => {
+                const check = setInterval(() => {
+                    if (registration.active) {
+                        clearInterval(check);
+                        resolve();
+                    }
+                }, 50);
+            });
+            console.log('Service Worker activated');
         }
     
-        // Получаем подписку
+        // Теперь можно подписываться
         let subscription = await registration.pushManager.getSubscription();
         if (!subscription) {
-            const publicKey = 'BNs9jjTGerRZIb1Oeok_ERtSdgr2fMqVnp2v_7A6qGuSgFliGucmqG9vq9VJYpsK2IaeAdbZ7Tm9IXE12X14Eg8'; // ваш публичный ключ
+            const publicKey = 'BNs9jjTGerRZIb1Oeok_ERtSdgr2fMqVnp2v_7A6qGuSgFliGucmqG9vq9VJYpsK2IaeAdbZ7Tm9IXE12X14Eg8';
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(publicKey)
