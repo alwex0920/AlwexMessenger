@@ -12,6 +12,10 @@
       "dest": "https://alwexmessenger.alwex.workers.dev/api/$1"
     },
     {
+      "src": "/sw.js",
+      "dest": "https://alwexmessenger.alwex.workers.dev/sw.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
