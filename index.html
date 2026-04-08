@@ -1540,53 +1540,9 @@
 
     // Регистрация Service Worker через Blob (обход проблемы с MIME)
     async function registerServiceWorker() {
-        const swCode = `
-            self.addEventListener('push', event => {
-                if (!event.data) return;
-                let data;
-                try {
-                    data = event.data.json();
-                } catch (e) {
-                    data = { title: 'Новое сообщение', body: event.data.text() };
-                }
-                const options = {
-                    body: data.body || '',
-                    icon: data.icon || '/favicon.ico',
-                    badge: '/favicon.ico',
-                    vibrate: [200, 100, 200],
-                    requireInteraction: true,
-                    data: data.data || {}
-                };
-                event.waitUntil(
-                    self.registration.showNotification(data.title || 'AlwexMessenger', options)
-                );
-            });
-    
-            self.addEventListener('notificationclick', event => {
-                event.notification.close();
-                const urlToOpen = event.notification.data?.chatId 
-                    ? \`/?chat=\${event.notification.data.chatId}\` 
-                    : '/';
-                event.waitUntil(
-                    clients.matchAll({ type: 'window', includeUncontrolled: true })
-                        .then(clients => {
-                            for (let client of clients) {
-                                if (client.url === urlToOpen && 'focus' in client) {
-                                    return client.focus();
-                                }
-                            }
-                            if (clients.openWindow) return clients.openWindow(urlToOpen);
-                        })
-                );
-            });
-        `;
-        
-        const blob = new Blob([swCode], { type: 'application/javascript' });
-        const blobUrl = URL.createObjectURL(blob);
         try {
-            const registration = await navigator.serviceWorker.register(blobUrl);
-            console.log('Service Worker registered via Blob', registration);
-            URL.revokeObjectURL(blobUrl);
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('Service Worker registered', registration);
             return registration;
         } catch (err) {
             console.error('Service Worker registration failed', err);
