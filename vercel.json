@@ -4,7 +4,8 @@
     {
       "src": "index.html",
       "use": "@vercel/static"
-    }
+    },
+    { "src": "site.webmanifest", "use": "@vercel/static" }
   ],
   "routes": [
     {
@@ -14,6 +15,11 @@
     {
       "src": "/sw.js",
       "dest": "https://alwexmessenger.alwex.workers.dev/sw.js"
+    },
+    {
+      "src": "/site.webmanifest",
+      "headers": { "Content-Type": "application/manifest+json" },
+      "dest": "/site.webmanifest"
     },
     {
       "src": "/(.*)",
