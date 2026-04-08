@@ -4,6 +4,10 @@
     {
       "src": "index.html",
       "use": "@vercel/static"
+    },
+    {
+      "src": "sw.js",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -15,6 +19,10 @@
       "src": "/(.*)",
       "dest": "/index.html"
     },
-    { "src": "/sw.js", "dest": "/sw.js", "headers": { "Content-Type": "application/javascript" } }
+    {
+      "src": "/sw.js",
+      "dest": "/sw.js",
+      "headers": { "Content-Type": "application/javascript" }
+    }
   ]
 }
