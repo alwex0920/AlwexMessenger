@@ -1526,6 +1526,77 @@
         }
     });
 
+    // Преобразование base64url в Uint8Array для VAPID ключа
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+    
+    // Регистрация Service Worker и подписка на push
+    async function subscribeToPush() {
+        if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+            console.warn('Push notifications not supported');
+            toast('Уведомления', 'Ваш браузер не поддерживает push-уведомления', 'info');
+            return;
+        }
+    
+        // Запрашиваем разрешение
+        if (Notification.permission !== 'granted') {
+            const result = await Notification.requestPermission();
+            if (result !== 'granted') {
+                toast('Уведомления', 'Разрешение не получено', 'info');
+                return;
+            }
+        }
+    
+        // Регистрируем Service Worker
+        let registration;
+        if (navigator.serviceWorker.controller) {
+            registration = await navigator.serviceWorker.ready;
+        } else {
+            registration = await navigator.serviceWorker.register('/sw.js');
+            await navigator.serviceWorker.ready;
+        }
+    
+        // Получаем существующую подписку или создаём новую
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+            const publicKey = 'BNs9jjTGerRZIb1Oeok_ERtSdgr2fMqVnp2v_7A6qGuSgFliGucmqG9vq9VJYpsK2IaeAdbZ7Tm9IXE12X14Eg8'; // Ваш VAPID публичный ключ
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(publicKey)
+            });
+        }
+    
+        // Отправляем подписку на сервер
+        const response = await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({
+                endpoint: subscription.endpoint,
+                keys: subscription.toJSON().keys
+            })
+        });
+    
+        if (response.ok) {
+            console.log('Push subscription saved');
+            toast('Уведомления', 'Включены', 'success');
+        } else {
+            const err = await response.json();
+            console.error('Failed to save subscription', err);
+            toast('Ошибка', 'Не удалось сохранить подписку', 'error');
+        }
+    }
+
     // Новая функция для отправки любого файла (изображения, документы, видео)
     async function uploadFile(input) {
         const file = input.files[0];
@@ -3066,6 +3137,9 @@
         toast('Добро пожаловать!', 'Привет, ' + (user.displayName || user.username) + '!', 'success');
         if (Notification.permission === 'default') {
             Notification.requestPermission();
+        }
+        if (Notification.permission !== 'denied') {
+            subscribeToPush().catch(console.error);
         }
     }
 
