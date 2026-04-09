@@ -1689,7 +1689,8 @@
         // Теперь можно подписываться
         let subscription = await registration.pushManager.getSubscription();
         if (!subscription) {
-            const publicKey = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEocxPnaQCLrT7CyWL8xsHzLkEXGjy1adRZlxaxkOEB7FvFQzzixoPsIUcoGMNj2Dq_V6kYbT5u-5kdbdp4XhbAQ';
+            const resp = await fetch('/api/vapid-public-key');
+            const { publicKey } = await resp.json();
             const rawPublicKey = await spkiToRawPublicKey(publicKey);
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
