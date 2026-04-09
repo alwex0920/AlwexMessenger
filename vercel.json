@@ -37,12 +37,12 @@
       "dest": "https://alwexmessenger.alwex.workers.dev/site.webmanifest"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    },
-    {
       "src": "/(.*)\\.(ico|png|jpg|jpeg|svg|webmanifest)",
       "dest": "/$1.$2"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
