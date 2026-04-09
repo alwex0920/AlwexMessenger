@@ -1677,7 +1677,7 @@
         // Теперь можно подписываться
         let subscription = await registration.pushManager.getSubscription();
         if (!subscription) {
-            const publicKey = 'BNs9jjTGerRZIb1Oeok_ERtSdgr2fMqVnp2v_7A6qGuSgFliGucmqG9vq9VJYpsK2IaeAdbZ7Tm9IXE12X14Eg8';
+            const publicKey = 'BE9GkvL46IFOriZLJEIPFbo8pwCY-yvYVT37cBk7Wos-UB8RCRXlFEWYdM3a3b4vzOuTDj9Wb2kN0iHUiZaTGjs';
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(publicKey)
