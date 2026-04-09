@@ -5,7 +5,23 @@
       "src": "index.html",
       "use": "@vercel/static"
     },
-    { "src": "site.webmanifest", "use": "@vercel/static" }
+    { "src": "site.webmanifest", "use": "@vercel/static" },
+    {
+      "src": "*.ico",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.png",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.jpg",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.svg",
+      "use": "@vercel/static"
+    }
   ],
   "routes": [
     {
@@ -24,6 +40,10 @@
     {
       "src": "/(.*)",
       "dest": "/index.html"
+    },
+    {
+      "src": "/(.*)\\.(ico|png|jpg|jpeg|svg|webmanifest)",
+      "dest": "/$1.$2"
     }
   ]
 }
