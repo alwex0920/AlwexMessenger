@@ -1644,7 +1644,7 @@
         const publicKey = await crypto.subtle.importKey(
             'spki', spkiBytes,
             { name: 'ECDSA', namedCurve: 'P-256' },
-            false,
+            true,
             ['verify']
         );
         const rawPublicKey = await crypto.subtle.exportKey('raw', publicKey);
