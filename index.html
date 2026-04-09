@@ -1638,6 +1638,18 @@
             throw err;
         }
     }
+
+    async function spkiToRawPublicKey(spkiBase64Url) {
+        const spkiBytes = urlBase64ToUint8Array(spkiBase64Url);
+        const publicKey = await crypto.subtle.importKey(
+            'spki', spkiBytes,
+            { name: 'ECDSA', namedCurve: 'P-256' },
+            false,
+            ['verify']
+        );
+        const rawPublicKey = await crypto.subtle.exportKey('raw', publicKey);
+        return new Uint8Array(rawPublicKey);
+}
         
     // Регистрация Service Worker и подписка на push
     async function subscribeToPush() {
@@ -1678,9 +1690,10 @@
         let subscription = await registration.pushManager.getSubscription();
         if (!subscription) {
             const publicKey = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEocxPnaQCLrT7CyWL8xsHzLkEXGjy1adRZlxaxkOEB7FvFQzzixoPsIUcoGMNj2Dq_V6kYbT5u-5kdbdp4XhbAQ';
+            const rawPublicKey = await spkiToRawPublicKey(publicKeySpki);
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(publicKey)
+                applicationServerKey: rawPublicKey
             });
         }
     
