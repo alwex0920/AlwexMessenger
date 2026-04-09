@@ -34,8 +34,7 @@
     },
     {
       "src": "/site.webmanifest",
-      "headers": { "Content-Type": "application/manifest+json" },
-      "dest": "/site.webmanifest"
+      "dest": "https://alwexmessenger.alwex.workers.dev/site.webmanifest"
     },
     {
       "src": "/(.*)",
