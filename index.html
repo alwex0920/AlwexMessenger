@@ -3264,8 +3264,10 @@
         toast('Добро пожаловать!', 'Привет, ' + (user.displayName || user.username) + '!', 'success');
         if (Notification.permission === 'default') {
             Notification.requestPermission();
+            subscribeToPush().catch(console.error);
         }
         if (Notification.permission !== 'denied') {
+            Notification.requestPermission();
             subscribeToPush().catch(console.error);
         }
     }
