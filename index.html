@@ -1691,6 +1691,8 @@
         if (!subscription) {
             const resp = await fetch('/api/vapid-public-key');
             const { publicKey } = await resp.json();
+            console.log(publicKey);
+            console.log(urlBase64ToUint8Array(publicKey);
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(publicKey)
