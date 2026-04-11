@@ -1691,10 +1691,9 @@
         if (!subscription) {
             const resp = await fetch('/api/vapid-public-key');
             const { publicKey } = await resp.json();
-            const rawPublicKey = await spkiToRawPublicKey(publicKey);
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
-                applicationServerKey: rawPublicKey
+                applicationServerKey: publicKey
             });
         }
     
