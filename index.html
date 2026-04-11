@@ -1704,6 +1704,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             body: JSON.stringify({
+                userId: user.id,
                 endpoint: subscription.endpoint,
                 keys: subscription.toJSON().keys
             })
