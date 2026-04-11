@@ -1689,7 +1689,7 @@
         // Теперь можно подписываться
         let subscription = await registration.pushManager.getSubscription();
         if (!subscription) {
-            const resp = await fetch('/api/vapid-public-key');
+            const resp = await fetch('https://alwexmessenger-web-push.alwex.workers.dev/api/vapid-public-key');
             const { publicKey } = await resp.json();
             console.log(publicKey);
             console.log(urlBase64ToUint8Array(publicKey));
@@ -1700,7 +1700,7 @@
         }
     
         // Отправляем подписку на сервер
-        const response = await fetch('/api/push/subscribe', {
+        const response = await fetch('https://alwexmessenger-web-push.alwex.workers.dev/api/subscribe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             body: JSON.stringify({
