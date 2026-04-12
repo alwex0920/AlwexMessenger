@@ -1556,6 +1556,19 @@
         }
     });
 
+    window.setFcmToken = (token) => {
+        if (window.user && window.user.id) {
+            fetch('https://alwexmessenger-web-push.alwex.workers.dev/api/subscribe-app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id, fcmToken: token })
+            });
+        } else {
+            // Сохранить токен в localStorage и отправить после логина
+            localStorage.setItem('pendingFcmToken', token);
+        }
+    };
+
     async function showTermsModalAndWait() {
         return new Promise((resolve) => {
             // Создаём модальное окно, если его ещё нет
