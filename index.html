@@ -1556,17 +1556,22 @@
         }
     });
 
-    window.setFcmToken = (token) => {
-        if (window.user && window.user.id) {
+    window.onFcmToken = function(token) {
+        console.log('FCM Token:', token);
+        const userId = localStorage.getItem('alwex_user_id');
+        if (userId) {
             fetch('https://alwexmessenger-web-push.alwex.workers.dev/api/subscribe-app', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.id, fcmToken: token })
+                body: JSON.stringify({ userId, fcmToken: token })
             });
-        } else {
-            // Сохранить токен в localStorage и отправить после логина
-            localStorage.setItem('pendingFcmToken', token);
         }
+    };
+
+    window.openChat = function(chatId) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('chat', chatId);
+      window.location.href = url.toString();
     };
 
     async function showTermsModalAndWait() {
@@ -3278,6 +3283,11 @@
         await loadChats();
         startPolling();
         toast('Добро пожаловать!', 'Привет, ' + (user.displayName || user.username) + '!', 'success');
+        const userId = user.id; // из ответа сервера
+        localStorage.setItem('alwex_user_id', userId);
+        if (window.AndroidApp) {
+            window.AndroidApp.saveUserId(userId.toString());
+        }
         if (Notification.permission === 'default') {
             Notification.requestPermission();
             subscribeToPush().catch(console.error);
