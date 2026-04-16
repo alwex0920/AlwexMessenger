@@ -2940,8 +2940,9 @@
 
     // ===== WebSocket =====
     function connectWebSocket(chatId, chatType) {
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        if (ws) {
             ws.close();
+            ws = null;
         }
         if (pingInterval) {
             clearInterval(pingInterval);
@@ -2953,10 +2954,10 @@
     
         ws.onopen = () => {
             console.log('WebSocket connected for', chatId);
-            const pingInterval = setInterval(() => {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'ping' }));
-              }
+            pingInterval = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
             }, 30000);
         };
     
@@ -3023,11 +3024,13 @@
     
         ws.onclose = (event) => {
             console.log('WebSocket closed', event.code, event.reason);
+            // Очищаем интервал при закрытии
             if (pingInterval) {
                 clearInterval(pingInterval);
                 pingInterval = null;
             }
             ws = null;
+            // Переподключение через 3 секунды
             if (currentChatId) {
                 setTimeout(() => {
                     if (currentChatId) connectWebSocket(currentChatId, currentChatType);
@@ -3037,10 +3040,6 @@
     
         ws.onerror = (err) => {
             console.error('WebSocket error:', err);
-            if (pingInterval) {
-                clearInterval(pingInterval);
-                pingInterval = null;
-            }
         };
     }
 
