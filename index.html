@@ -1516,6 +1516,7 @@
     let pendingImage = null;
     let keepWarmInterval;
     let ws = null;
+    let pingInterval = null;
     let currentChatId = null;
     let currentGroupForAdd = null;
     let qrScanner = null;
@@ -1573,12 +1574,6 @@
       url.searchParams.set('chat', chatId);
       window.location.href = url.toString();
     };
-
-    setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }));
-        }
-    }, 30000);
 
     async function showTermsModalAndWait() {
         return new Promise((resolve) => {
@@ -2948,12 +2943,21 @@
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.close();
         }
+        if (pingInterval) {
+            clearInterval(pingInterval);
+            pingInterval = null;
+        }
         currentChatId = chatId;
         const wsUrl = `wss://alwexmessenger.alwex.workers.dev/api/ws?chatId=${chatId}&userId=${user.id}&token=${token}`;
         ws = new WebSocket(wsUrl);
     
         ws.onopen = () => {
             console.log('WebSocket connected for', chatId);
+            const pingInterval = setInterval(() => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+              }
+            }, 30000);
         };
     
         ws.onmessage = (event) => {
@@ -3019,6 +3023,10 @@
     
         ws.onclose = (event) => {
             console.log('WebSocket closed', event.code, event.reason);
+            if (pingInterval) {
+                clearInterval(pingInterval);
+                pingInterval = null;
+            }
             ws = null;
             if (currentChatId) {
                 setTimeout(() => {
@@ -3029,6 +3037,10 @@
     
         ws.onerror = (err) => {
             console.error('WebSocket error:', err);
+            if (pingInterval) {
+                clearInterval(pingInterval);
+                pingInterval = null;
+            }
         };
     }
 
