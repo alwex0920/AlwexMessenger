@@ -1574,6 +1574,12 @@
       window.location.href = url.toString();
     };
 
+    setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+        }
+    }, 30000);
+
     async function showTermsModalAndWait() {
         return new Promise((resolve) => {
             // Создаём модальное окно, если его ещё нет
