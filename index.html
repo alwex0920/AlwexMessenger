@@ -1886,6 +1886,9 @@
     logout = async function(skipConfirm = false) {
         if (!skipConfirm && !confirm('Выйти из аккаунта?')) return;
         disconnectWebSocket();
+        if (window.AndroidApp) {
+            window.AndroidApp.stopPolling();
+        }
         await api('/api/logout', { method: 'POST' });
         localStorage.removeItem('alwex_token');
         localStorage.removeItem('alwex_user');
@@ -3284,6 +3287,9 @@
     async function logout() {
         if (!confirm('Выйти из аккаунта?')) return;
         disconnectWebSocket();
+        if (window.AndroidApp) {
+            window.AndroidApp.stopPolling();
+        }
         await api('/api/logout', { method: 'POST' });
         localStorage.removeItem('alwex_token');
         localStorage.removeItem('alwex_user');
@@ -3306,6 +3312,9 @@
         localStorage.setItem('alwex_user_id', userId);
         if (window.AndroidApp) {
             window.AndroidApp.saveUserId(userId.toString());
+        }
+        if (window.AndroidApp) {
+            window.AndroidApp.saveAuthToken(token);
         }
         if (Notification.permission === 'default') {
             Notification.requestPermission();
