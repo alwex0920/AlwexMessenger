@@ -1577,51 +1577,6 @@
       window.location.href = url.toString();
     };
 
-    async function resetNotifications() {
-        try {
-            // 1. Отписываемся от старой подписки
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.getSubscription();
-            if (subscription) {
-                await subscription.unsubscribe();
-                console.log('✅ Старая подписка удалена');
-            }
-    
-            // 2. Сбрасываем флаг в localStorage
-            localStorage.removeItem('push_subscribed');
-    
-            // 3. Запрашиваем разрешение заново
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') {
-                alert('Не удалось получить разрешение на уведомления');
-                return;
-            }
-    
-            // 4. Создаём новую подписку (используйте вашу функцию subscribeUserToPush)
-            const vapidPublicKey = await fetch('https://alwexmessenger-web-push.alwex.workers.dev/api/vapid-public-key').then(r => r.json()).then(d => d.publicKey);
-            const newSubscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
-            });
-    
-            // 5. Отправляем новую подписку на сервер
-            await fetch('/api/subscribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    userId: user.id,
-                    endpoint: newSubscription.endpoint,
-                    keys: newSubscription.keys
-                })
-            });
-    
-            alert('✅ Уведомления успешно переподключены!');
-        } catch (e) {
-            console.error('Ошибка сброса уведомлений:', e);
-            alert('❌ Не удалось сбросить уведомления. Попробуйте перезагрузить страницу.');
-        }
-    }
-
     async function showTermsModalAndWait() {
         return new Promise((resolve) => {
             // Создаём модальное окно, если его ещё нет
@@ -1691,6 +1646,51 @@
             outputArray[i] = rawData.charCodeAt(i);
         }
         return outputArray;
+    }
+
+    async function resetNotifications() {
+        try {
+            // 1. Отписываемся от старой подписки
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.getSubscription();
+            if (subscription) {
+                await subscription.unsubscribe();
+                console.log('✅ Старая подписка удалена');
+            }
+    
+            // 2. Сбрасываем флаг в localStorage
+            localStorage.removeItem('push_subscribed');
+    
+            // 3. Запрашиваем разрешение заново
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                alert('Не удалось получить разрешение на уведомления');
+                return;
+            }
+    
+            // 4. Создаём новую подписку (используйте вашу функцию subscribeUserToPush)
+            const vapidPublicKey = await fetch('https://alwexmessenger-web-push.alwex.workers.dev/api/vapid-public-key').then(r => r.json()).then(d => d.publicKey);
+            const newSubscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+            });
+    
+            // 5. Отправляем новую подписку на сервер
+            await fetch('/api/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    userId: user.id,
+                    endpoint: newSubscription.endpoint,
+                    keys: newSubscription.keys
+                })
+            });
+    
+            alert('✅ Уведомления успешно переподключены!');
+        } catch (e) {
+            console.error('Ошибка сброса уведомлений:', e);
+            alert('❌ Не удалось сбросить уведомления. Попробуйте перезагрузить страницу.');
+        }
     }
 
     // Регистрация Service Worker через Blob (обход проблемы с MIME)
