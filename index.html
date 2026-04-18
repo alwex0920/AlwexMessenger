@@ -2968,7 +2968,7 @@
             const data = JSON.parse(event.data);
             if (data.type === 'message') {
                 messagesById[data.message.id] = data.message;
-                (data.message, currentChatType === 'group');
+                addMessageToUI(data.message, currentChatType === 'group');
                 document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
 
                 if (currentChatType === 'direct' && data.message.senderId !== user.id) {
