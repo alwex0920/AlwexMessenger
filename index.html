@@ -1598,7 +1598,7 @@
             }
     
             // 4. Создаём новую подписку (используйте вашу функцию subscribeUserToPush)
-            const vapidPublicKey = await fetch('/api/vapid-public-key').then(r => r.json()).then(d => d.publicKey);
+            const vapidPublicKey = await fetch('https://alwexmessenger-web-push.alwex.workers.dev/api/vapid-public-key').then(r => r.json()).then(d => d.publicKey);
             const newSubscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
