@@ -852,8 +852,10 @@
                     <select id="editGender">
                         <option value="male">Мужской</option>
                         <option value="female">Женский</option>
-                        <option value="other">Другое</option>
                     </select>
+                </div>
+                <div style="text-align:center; margin:16px 0;">
+                    <button class="btn btn-secondary btn-sm" onclick="resetNotifications()">🔄 Сбросить уведомления</button>
                 </div>
                 <div style="text-align:center; margin:16px 0;">
                     <button class="btn btn-secondary btn-sm" onclick="exportKey()">📤 Экспортировать ключ (QR)</button>
@@ -1575,6 +1577,51 @@
       window.location.href = url.toString();
     };
 
+    async function resetNotifications() {
+        try {
+            // 1. Отписываемся от старой подписки
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.getSubscription();
+            if (subscription) {
+                await subscription.unsubscribe();
+                console.log('✅ Старая подписка удалена');
+            }
+    
+            // 2. Сбрасываем флаг в localStorage
+            localStorage.removeItem('push_subscribed');
+    
+            // 3. Запрашиваем разрешение заново
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                alert('Не удалось получить разрешение на уведомления');
+                return;
+            }
+    
+            // 4. Создаём новую подписку (используйте вашу функцию subscribeUserToPush)
+            const vapidPublicKey = await fetch('/api/vapid-public-key').then(r => r.json()).then(d => d.publicKey);
+            const newSubscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+            });
+    
+            // 5. Отправляем новую подписку на сервер
+            await fetch('/api/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    userId: user.id,
+                    endpoint: newSubscription.endpoint,
+                    keys: newSubscription.keys
+                })
+            });
+    
+            alert('✅ Уведомления успешно переподключены!');
+        } catch (e) {
+            console.error('Ошибка сброса уведомлений:', e);
+            alert('❌ Не удалось сбросить уведомления. Попробуйте перезагрузить страницу.');
+        }
+    }
+
     async function showTermsModalAndWait() {
         return new Promise((resolve) => {
             // Создаём модальное окно, если его ещё нет
@@ -2050,6 +2097,7 @@
                     <li>Нажмите кнопку ниже, чтобы скачать профиль.</li>
                     <li>Откройте <strong>Настройки → Профиль загружен</strong> и установите его.</li>
                     <li>После установки на рабочем столе появится иконка приложения.</li>
+                    <li>Если уведомления перестали приходить, то сбросьте уведомления в настройках профиля</li>
                 </ol>
                 <a href="/api/ios-profile" class="btn btn-primary" style="width:auto; display:inline-block;">Скачать профиль</a>
                 <p style="margin-top:16px; font-size:12px; color:var(--text2)">Если профиль не устанавливается, перейдите в Настройки → Основные → VPN и управление устройством и доверьте профилю.</p>
