@@ -2402,16 +2402,27 @@
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         if (code) {
-            const data = await api('/api/channels/info?code=' + encodeURIComponent(code));
+            // Сначала пробуем получить информацию как о канале
+            let data = await api('/api/channels/info?code=' + encodeURIComponent(code));
+            let type = 'channel';
+            if (data.error) {
+                // Если не канал, пробуем группу
+                data = await api('/api/groups/invite/' + code);
+                type = 'group';
+            }
             if (data.error) {
                 toast('Ошибка', data.error, 'error');
             } else {
-                const ch = data.channel;
-                if (confirm(`Хотите подписаться на канал "${ch.name}"?`)) {
-                    await subscribeToChannel(code);
+                const entity = data.channel || data.group;
+                const actionText = type === 'channel' ? 'подписаться на канал' : 'вступить в группу';
+                if (confirm(`Хотите ${actionText} "${entity.name}"?`)) {
+                    if (type === 'channel') {
+                        await subscribeToChannel(code);
+                    } else {
+                        await joinGroupByCode(code);
+                    }
                 }
             }
-            // Убираем параметр из URL, чтобы не мешал
             window.history.replaceState({}, document.title, window.location.pathname);
         }
     })();
@@ -2449,6 +2460,55 @@
         }
     }
 
+    async function joinGroupByCode(code) {
+        if (!token) {
+            toast('Ошибка', 'Необходимо авторизоваться', 'error');
+            return;
+        }
+        // Сначала получаем информацию о группе
+        const infoRes = await api('/api/groups/invite/' + code);
+        if (infoRes.error) {
+            toast('Ошибка', infoRes.error, 'error');
+            return;
+        }
+        const group = infoRes.group;
+        
+        // Для групп нужен зашифрованный ключ
+        let encryptedKey = null;
+        if (group.type === 'group') {
+            // В реальном приложении здесь нужно запросить ключ у создателя или использовать другой механизм.
+            // Пока оставим заглушку – вступить можно только если админ отправил ключ отдельно.
+            // Для демонстрации просто предупредим.
+            if (!confirm('Для вступления в зашифрованную группу необходим ключ. Если у вас его нет, попросите администратора поделиться ключом. Продолжить без ключа (сообщения не будут расшифрованы)?')) {
+                return;
+            }
+            // В будущем можно добавить поле ввода ключа
+            encryptedKey = prompt('Вставьте зашифрованный ключ группы (если есть):') || null;
+        }
+
+        if (group.type === 'group' && !encryptedKey) {
+            // Отправляем запрос на получение ключа
+            await api('/api/groups/' + joinRes.groupId + '/request-key', { method: 'POST' });
+            toast('Запрос ключа отправлен администраторам', 'Ожидайте подтверждения', 'info');
+        }
+        
+        const joinRes = await api('/api/groups/join/' + code, {
+            method: 'POST',
+            body: { encryptedKey }
+        });
+        
+        if (joinRes.error) {
+            toast('Ошибка', joinRes.error, 'error');
+            return;
+        }
+        
+        toast('Успешно', 'Вы вступили в группу!', 'success');
+        await loadChats();
+        if (joinRes.groupId) {
+            openGroupChat(joinRes.groupId);
+        }
+    }
+
     // Предпросмотр аватара группы (опционально)
     function previewGroupAvatar(input) {
         if (!input.files || !input.files[0]) return;
@@ -2468,7 +2528,7 @@
     
     // Загрузка аватара группы
     async function uploadGroupAvatar(imageData) {
-        const groupId = window.currentGroupId; // предполагаем, что эта переменная установлена в showGroupInfo
+        const groupId = window.currentGroupId; // предполагаем, что эта переменная установлена в 
         if (!groupId) return;
     
         const data = await api('/api/groups/avatar', {
@@ -4173,6 +4233,30 @@
         }
     }
 
+    async function sendKeyToUser(groupId, userId, publicKey) {
+        const groupKey = groups[groupId]?.key;
+        if (!groupKey) {
+            toast('Ошибка', 'Ключ группы не найден', 'error');
+            return;
+        }
+        try {
+            const encryptedKey = await CryptoHelper.encryptKeyForUser(groupKey, publicKey);
+            const res = await api('/api/groups/' + groupId + '/send-key', {
+                method: 'POST',
+                body: { userId, encryptedKey }
+            });
+            if (res.error) {
+                toast('Ошибка', res.error, 'error');
+            } else {
+                toast('Успешно', 'Ключ отправлен', 'success');
+                // Обновить модалку
+                showGroupInfo(groupId);
+            }
+        } catch (e) {
+            toast('Ошибка', 'Не удалось зашифровать ключ', 'error');
+        }
+    }
+        
     function showChatInfo() {
         if (!currentChat) return;
         if (currentChatType === 'group' || currentChatType === 'channel') {
@@ -4198,12 +4282,15 @@
         const isAdmin = data.members.some(m => m.id === user.id && m.role === 'admin');
 
         const isChannel = data.group.type === 'channel';
+        // Показываем секцию с приглашением для групп
+        const isGroup = data.group.type === 'group';
         const inviteSection = document.getElementById('channelInviteSection');
         const inviteLinkInput = document.getElementById('channelInviteLink');
-        if (isChannel) {
+        if (isGroup || data.group.type === 'channel') {
             const inviteLink = window.location.origin + '?code=' + data.group.inviteCode;
             inviteLinkInput.value = inviteLink;
             inviteSection.style.display = 'block';
+            document.querySelector('#channelInviteSection h3').textContent = isGroup ? 'Ссылка-приглашение в группу' : 'Ссылка-приглашение в канал';
         } else {
             inviteSection.style.display = 'none';
         }
@@ -4224,6 +4311,27 @@
                 </div>
             `;
         });
+
+        // Загрузка запросов ключей (только для админов)
+        if (isOwner || isAdmin) {
+            const reqData = await api('/api/groups/' + groupId + '/key-requests');
+            if (reqData.requests && reqData.requests.length > 0) {
+                let reqHtml = '<div class="settings-section"><h3>Ожидают ключ</h3>';
+                reqData.requests.forEach(r => {
+                    reqHtml += `
+                        <div class="user-item" style="justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <img src="${escapeHtml(r.custom_avatar || r.avatar)}" style="width: 32px; height: 32px; border-radius: 50%;">
+                                <span>${escapeHtml(r.display_name || r.username)}</span>
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="sendKeyToUser(${groupId}, ${r.user_id}, '${escapeHtml(r.public_key)}')">Отправить ключ</button>
+                        </div>
+                    `;
+                });
+                reqHtml += '</div>';
+                membersList.insertAdjacentHTML('beforebegin', reqHtml);
+            }
+        }
 
         window.currentGroupId = groupId;
         window.currentGroupOwnerId = data.group.ownerId;
