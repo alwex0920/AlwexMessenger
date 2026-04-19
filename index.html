@@ -4301,13 +4301,18 @@
         membersList.innerHTML = '';
         data.members.forEach(m => {
             const roleText = m.role === 'admin' ? 'Админ' : '';
+            const canDelete = (isOwner || isAdmin) && m.id !== user.id && m.id !== group.owner_id; // владельца удалить нельзя (только выход)
+            const deleteButton = canDelete ? 
+                `<button class="icon-btn small" onclick="deleteGroupMember(${groupId}, ${m.id})" style="margin-left: auto;" title="Удалить участника">🗑️</button>` : '';
+            
             membersList.innerHTML += `
-                <div class="user-item" onclick="showUserProfile(${m.id})">
+                <div class="user-item" onclick="showUserProfile(${m.id})" style="display: flex; align-items: center;">
                     <img src="${escapeHtml(m.avatar)}">
                     <div class="user-item-info">
                         <div class="user-item-name">${escapeHtml(m.displayName || m.username)}</div>
                         <div class="user-item-status">${roleText} ${m.online ? '● в сети' : ''}</div>
                     </div>
+                    ${deleteButton}
                 </div>
             `;
         });
@@ -4349,6 +4354,23 @@
         closeModal('groupInfoModal');
         document.getElementById('backBtn').click();
         await loadChats();
+    }
+
+    async function deleteGroupMember(groupId, memberId) {
+        if (!confirm('Удалить участника из группы?')) return;
+        const data = await api(`/api/groups/${groupId}/members/${memberId}`, { method: 'DELETE' });
+        if (data.error) {
+            toast('Ошибка', data.error, 'error');
+        } else {
+            toast('Успешно', 'Участник удалён', 'success');
+            showGroupInfo(groupId); // обновить модалку
+            if (memberId === user.id) {
+                // Если удалили самого себя – закрыть чат и вернуться в список
+                closeModal('groupInfoModal');
+                document.getElementById('backBtn').click();
+                await loadChats();
+            }
+        }
     }
 
     async function deleteGroup() {
