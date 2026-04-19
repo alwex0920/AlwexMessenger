@@ -4268,6 +4268,7 @@
 
     async function showGroupInfo(groupId) {
         const data = await api('/api/groups/' + groupId);
+        const group = data.group;
         if (data.error) {
             toast('Ошибка', data.error, 'error');
             return;
@@ -4301,7 +4302,7 @@
         membersList.innerHTML = '';
         data.members.forEach(m => {
             const roleText = m.role === 'admin' ? 'Админ' : '';
-            const canDelete = (isOwner || isAdmin) && m.id !== user.id && m.id !== group.owner_id; // владельца удалить нельзя (только выход)
+            const canDelete = (isOwner || isAdmin) && m.id !== user.id && m.id !== group.ownerId;
             const deleteButton = canDelete ? 
                 `<button class="icon-btn small" onclick="deleteGroupMember(${groupId}, ${m.id})" style="margin-left: auto;" title="Удалить участника">🗑️</button>` : '';
             
