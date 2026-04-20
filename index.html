@@ -179,6 +179,16 @@
         .preview-container{position:relative;display:inline-block}
         .preview-container img{max-width:150px;max-height:100px;border-radius:8px}
         .preview-remove{position:absolute;top:-8px;right:-8px;width:24px;height:24px;border:none;border-radius:50%;background:var(--danger);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px}
+
+        /* Video Preview */
+        .video-preview { }
+        .video-preview.show { display: block; }
+        .msg-video {
+            max-width: 280px;
+            max-height: 300px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
         
         /* Modal */
         .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(5px);z-index:1000;align-items:center;justify-content:center;padding:20px}
@@ -693,6 +703,12 @@
                 <div class="preview-container">
                     <img id="previewImage" src="">
                     <button class="preview-remove" onclick="clearImagePreview()">&times;</button>
+                </div>
+            </div>
+            <div class="video-preview" id="videoPreview" style="display:none; padding:8px 16px; background:var(--bg2); border-top:1px solid var(--border);">
+                <div class="preview-container">
+                    <video id="previewVideo" controls style="max-width:200px; max-height:150px; border-radius:8px;"></video>
+                    <button class="preview-remove" onclick="clearVideoPreview()">&times;</button>
                 </div>
             </div>
             <div class="input-area" id="inputArea" style="display:none">
@@ -1516,6 +1532,8 @@
     let selectedGender = null;
     let selectedGroupMembers = [];
     let pendingImage = null;
+    let pendingVideo = null;
+    let pendingVideoFile = null; // для хранения файла перед отправкой
     let keepWarmInterval;
     let ws = null;
     let pingInterval = null;
@@ -1576,6 +1594,33 @@
       url.searchParams.set('chat', chatId);
       window.location.href = url.toString();
     };
+
+    function previewVideo(input) {
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+        if (!file.type.startsWith('video/')) return;
+        if (file.size > 30 * 1024 * 1024) { // лимит 30 МБ
+            toast('Ошибка', 'Видео слишком большое (макс. 30 МБ)', 'error');
+            input.value = '';
+            return;
+        }
+        
+        pendingVideoFile = file;
+        const url = URL.createObjectURL(file);
+        const video = document.getElementById('previewVideo');
+        video.src = url;
+        document.getElementById('videoPreview').classList.add('show');
+        input.value = '';
+    }
+    
+    function clearVideoPreview() {
+        if (pendingVideoFile) {
+            URL.revokeObjectURL(document.getElementById('previewVideo').src);
+            pendingVideoFile = null;
+        }
+        document.getElementById('videoPreview').classList.remove('show');
+        document.getElementById('previewVideo').src = '';
+    }
 
     async function showTermsModalAndWait() {
         return new Promise((resolve) => {
@@ -1813,6 +1858,10 @@
         }
         formData.append('chatId', formattedChatId);
         formData.append('type', file.type.startsWith('image/') ? 'image' : 'file');
+        if (file.type.startsWith('video/')) {
+            previewVideo(input); // показываем предпросмотр
+            return; // не отправляем сразу, ждём кнопку отправки
+        }
     
         const res = await fetch('/api/upload', {
             method: 'POST',
@@ -3767,6 +3816,9 @@
             if (fileSize) {
                 content += `<span class="file-size" style="color:var(--text2); margin-left:4px;">${fileSize}</span>`;
             }
+        } else if (m.type === 'video' && m.mediaData) {
+            const videoUrl = `/api/files/${escapeHtml(m.mediaData)}?token=${encodeURIComponent(token)}`;
+            content += `<video class="msg-video" controls src="${videoUrl}" onclick="event.stopPropagation()"></video>`;
         } else {
             content += `<div class="msg-text">${escapeHtml(messageText)}</div>`;
         }
@@ -3866,6 +3918,7 @@
         document.getElementById('inputArea').style.display = 'none';
         document.getElementById('chatEmpty').style.display = 'flex';
         clearImagePreview();
+        clearVideoPreview();
     };
 
     document.getElementById('msgInput').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } };
@@ -3875,7 +3928,7 @@
     async function sendMsg() {
         const input = document.getElementById('msgInput');
         const content = input.value.trim();
-        if (!content && !pendingImage) return;
+        if (!content && !pendingImage && !pendingVideoFile) return;
         if (!currentChat) return;
     
         const msgId = generateUUID();
@@ -3890,15 +3943,51 @@
         } else {
             body.groupId = currentChat.id;
         }
-
+    
         if (currentChatType === 'direct' && currentChat.id === user.id) {
             toast('Ошибка', 'Нельзя отправить сообщение самому себе', 'error');
             return;
         }
     
+        let mediaData = null;
+        let mediaType = null;
+    
         if (pendingImage) {
-            body.type = 'image';
-            body.mediaData = pendingImage;
+            mediaData = pendingImage;
+            mediaType = 'image';
+        } else if (pendingVideoFile) {
+            toast('Информация', 'Видео загружается...', 'info');
+            const formData = new FormData();
+            formData.append('file', pendingVideoFile);
+            let formattedChatId;
+            if (currentChatType === 'direct') {
+                const min = Math.min(user.id, currentChat.id);
+                const max = Math.max(user.id, currentChat.id);
+                formattedChatId = `direct-${min}-${max}`;
+            } else {
+                formattedChatId = `${currentChatType}-${currentChat.id}`;
+            }
+            formData.append('chatId', formattedChatId);
+            formData.append('type', 'video');
+    
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token },
+                body: formData
+            });
+            const data = await res.json();
+            if (data.error) {
+                toast('Ошибка', data.error, 'error');
+                return;
+            }
+            mediaData = data.fileId;
+            mediaType = 'video';
+            clearVideoPreview();
+        }
+    
+        if (mediaData) {
+            body.type = mediaType;
+            body.mediaData = mediaData;
             body.content = '';
         } else {
             body.type = 'text';
@@ -3959,8 +4048,8 @@
                 id: msgId,
                 senderId: user.id,
                 content: content,
-                type: pendingImage ? 'image' : 'text',
-                mediaData: pendingImage || null,
+                type: mediaType || 'text',
+                mediaData: mediaData,
                 createdAt: Date.now()
             };
             addMessageToUI(localMessage, currentChatType === 'group');
@@ -3976,11 +4065,12 @@
                 encryptedKey: body.encryptedKey,
                 encryptedKeyForSender: body.encryptedKeyForSender,
                 nonce: body.nonce,
-                mediaData: pendingImage,
+                mediaData: mediaData,
                 replyTo: body.replyTo || null
             }));
     
             clearImagePreview();
+            clearVideoPreview();
         } else {
             const data = await api('/api/messages', { method: 'POST', body });
             if (data.message) {
