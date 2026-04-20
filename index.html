@@ -717,12 +717,16 @@
                         <button class="icon-btn small ripple" onclick="document.getElementById('fileInput').click()" title="Отправить фото">
                             <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
                         </button>
+                        <button class="icon-btn small ripple" onclick="document.getElementById('videoInput').click()" title="Отправить видео">
+                            <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                        </button>
                         <button class="icon-btn small ripple" onclick="document.getElementById('fileInput').click()" title="Отправить файл">
                             <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
                         </button>
                     </div>
                     <textarea id="msgInput" placeholder="Сообщение..." rows="1"></textarea>
                     <input type="file" id="fileInput" style="display:none" onchange="uploadFile(this)">
+                    <input type="file" id="videoInput" accept="video/*" style="display:none" onchange="uploadFile(this)">
                 </div>
                 <button class="send-btn ripple" id="sendBtn" onclick="sendMsg()">
                     <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
