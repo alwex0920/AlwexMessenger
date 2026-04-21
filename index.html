@@ -3275,7 +3275,7 @@
             }, 30000);
         };
     
-        ws.onmessage = (event) => {
+        ws.onmessage = async (event) => {
             const data = JSON.parse(event.data);
             if (data.type === 'message') {
                 messagesById[data.message.id] = data.message;
