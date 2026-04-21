@@ -1744,7 +1744,7 @@
         ws.send(JSON.stringify(payload));
     }
 
-    function endCall() {
+    async function endCall() {
         if (peerConnection) {
             peerConnection.close();
             peerConnection = null;
