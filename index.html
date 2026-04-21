@@ -1706,7 +1706,8 @@
     
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
-            sendSignalingMessage({ type: 'call_offer', offer: offer });
+            console.log('📤 Sending call_offer:', offer);
+            sendSignalingMessage({ type: 'call_offer', offer: { type: offer.type, sdp: offer.sdp } });
     
             isInCall = true;
             currentCallChatId = currentChatId;
@@ -3367,6 +3368,7 @@
     
         ws.onmessage = async (event) => {
             const data = JSON.parse(event.data);
+            console.log('📨 WebSocket message received:', data);
             if (data.type === 'message') {
                 messagesById[data.message.id] = data.message;
                 addMessageToUI(data.message, currentChatType === 'group');
