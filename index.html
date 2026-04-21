@@ -684,12 +684,18 @@
                 <p>Начните общение с друзьями</p>
             </div>
             <header class="chat-head" id="chatHead" style="display:none">
-                <button class="icon-btn chat-head-back ripple" id="backBtn"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>
+                <button class="icon-btn chat-head-back ripple" id="backBtn">
+                    <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                </button>
                 <img id="chatAvatar" src="" onclick="showChatInfo()">
                 <div class="chat-head-info" onclick="showChatInfo()">
                     <div class="chat-head-name" id="chatName"></div>
                     <div class="chat-head-status" id="chatStatus"></div>
                 </div>
+                <!-- Кнопка прижата к правому краю -->
+                <button class="icon-btn ripple" id="callBtn" onclick="startCall()" title="Позвонить" style="margin-left: auto;">
+                    <svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+                </button>
             </header>
             <div id="pinnedMessageBar" style="display:none; padding:8px 16px; background:var(--bg3); border-bottom:1px solid var(--border); align-items: center; gap: 8px;">
                 <span>📌</span>
@@ -1203,6 +1209,21 @@
             </div>
         </div>
     </div>
+    <div class="modal" id="callModal">
+        <div class="modal-box" style="max-width: 800px;">
+            <div class="modal-head">
+                <h2>Звонок</h2>
+                <button class="icon-btn ripple" onclick="endCall()">✖</button>
+            </div>
+            <div class="modal-body" style="display: flex; gap: 16px;">
+                <video id="localVideo" autoplay muted playsinline style="width: 45%; background: #000; border-radius: 12px;"></video>
+                <video id="remoteVideo" autoplay playsinline style="width: 45%; background: #000; border-radius: 12px;"></video>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="endCall()">Завершить</button>
+            </div>
+        </div>
+    </div>
     <script>
     // ============================================
     // КРИПТОГРАФИЯ E2E - НОВЫЙ КОД
@@ -1550,6 +1571,18 @@
     let replyToId = null;          // ID сообщения, на которое отвечаем
     let replyToContent = '';       // текст для отображения в плашке
     let messagesById = {}; // словарь всех загруженных сообщений по id
+    let localStream = null;
+    let peerConnection = null;
+    let isInCall = false;
+    let currentCallChatId = null;
+    
+    const rtcConfig = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            // можно добавить бесплатный TURN для надёжности
+        ]
+    };
 
     document.addEventListener('click', async (e) => {
         const link = e.target.closest('.file-link');
@@ -1599,6 +1632,95 @@
       window.location.href = url.toString();
     };
 
+    async function startCall() {
+        if (!currentChat || currentChatType !== 'direct') {
+            toast('Звонки', 'Пока только в личных чатах', 'info');
+            return;
+        }
+        if (isInCall) {
+            toast('Звонок уже активен', '', 'warning');
+            return;
+        }
+    
+        try {
+            // Запрашиваем доступ к камере и микрофону
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            
+            // Показываем локальное видео (можно в модальном окне)
+            showCallModal();
+            document.getElementById('localVideo').srcObject = localStream;
+    
+            // Создаём peer connection
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            
+            // Добавляем локальные треки
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+    
+            // Обработчик удалённого трека
+            peerConnection.ontrack = (event) => {
+                document.getElementById('remoteVideo').srcObject = event.streams[0];
+            };
+    
+            // Обработчик ICE-кандидатов
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    sendSignalingMessage({
+                        type: 'ice_candidate',
+                        candidate: event.candidate
+                    });
+                }
+            };
+    
+            // Создаём offer
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            
+            sendSignalingMessage({
+                type: 'call_offer',
+                offer: offer
+            });
+    
+            isInCall = true;
+            currentCallChatId = currentChatId;
+        } catch (err) {
+            console.error('Ошибка начала звонка:', err);
+            toast('Ошибка', 'Не удалось получить доступ к камере/микрофону', 'error');
+        }
+    }
+
+    async function acceptCall(offer) {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            showCallModal();
+            document.getElementById('localVideo').srcObject = localStream;
+    
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+    
+            peerConnection.ontrack = (event) => {
+                document.getElementById('remoteVideo').srcObject = event.streams[0];
+            };
+    
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    sendSignalingMessage({ type: 'ice_candidate', candidate: event.candidate });
+                }
+            };
+    
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            
+            sendSignalingMessage({ type: 'call_answer', answer: answer });
+    
+            isInCall = true;
+            currentCallChatId = currentChatId;
+        } catch (err) {
+            console.error(err);
+            toast('Ошибка', 'Не удалось принять звонок', 'error');
+        }
+    }
+        
     function previewVideo(input) {
         if (!input.files || !input.files[0]) return;
         const file = input.files[0];
@@ -1615,6 +1737,34 @@
         video.src = url;
         document.getElementById('videoPreview').classList.add('show');
         input.value = '';
+    }
+
+    function sendSignalingMessage(payload) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify(payload));
+    }
+
+    function endCall() {
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+        hideCallModal();
+        isInCall = false;
+        
+        // Уведомляем собеседника
+        sendSignalingMessage({ type: 'call_end' });
+    }
+
+    function showCallModal() {
+        document.getElementById('callModal').classList.add('show');
+    }
+    function hideCallModal() {
+        document.getElementById('callModal').classList.remove('show');
     }
     
     function clearVideoPreview() {
@@ -3183,6 +3333,23 @@
                 toast('Пользователь вышел', '', 'info');
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
+            } else if (data.type === 'call_offer') {
+                // Если мы не в звонке, показываем уведомление о входящем
+                if (!isInCall) {
+                    if (confirm(`Входящий звонок от ${currentChat.displayName || 'собеседника'}. Принять?`)) {
+                        await acceptCall(data.offer);
+                    }
+                }
+            } else if (data.type === 'call_answer') {
+                if (peerConnection) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                }
+            } else if (data.type === 'ice_candidate') {
+                if (peerConnection && data.candidate) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+            } else if (data.type === 'call_end') {
+                endCall();
             }
         };
     
