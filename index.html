@@ -139,10 +139,28 @@
         .chat-head{padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
         .chat-head-back{display:none}
         .chat-head img{width:40px;height:40px;border-radius:50%;cursor:pointer}
-        .chat-head-info{flex:1;cursor:pointer}
-        .chat-head-name{font-weight:600}
-        .chat-head-status{font-size:12px;color:var(--text2)}
-        .chat-head-status.online{color:var(--success)}
+        .chat-head-info {
+            flex: 1;
+            cursor: pointer;
+            min-width: 0;           /* позволяет сжиматься */
+            overflow: hidden;       /* скрывает переполнение */
+        }
+        .chat-head-name {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .chat-head-status {
+            font-size: 12px;
+            color: var(--text2);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .chat-head-status.online {
+            color: var(--success);
+        }
         .messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:4px}
         .message{display:flex;max-width:75%;animation:msgIn .3s cubic-bezier(.34,1.56,.64,1)}
         @keyframes msgIn{from{opacity:0;transform:translateY(20px) scale(.8)}to{opacity:1;transform:translateY(0) scale(1)}}
