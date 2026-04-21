@@ -1786,6 +1786,16 @@
             await peerConnection.setLocalDescription(offer);
             console.log('📤 Sending call_offer, local SDP:', offer.sdp);
             sendSignalingMessage({ type: 'call_offer', offer: { type: offer.type, sdp: offer.sdp } });
+            let offerRetries = 0;
+            const offerInterval = setInterval(() => {
+                if (peerConnection && peerConnection.signalingState !== 'stable' && offerRetries < 3) {
+                    console.log('🔄 Resending call_offer, attempt', offerRetries + 1);
+                    sendSignalingMessage({ type: 'call_offer', offer: { type: peerConnection.localDescription.type, sdp: peerConnection.localDescription.sdp } });
+                    offerRetries++;
+                } else {
+                    clearInterval(offerInterval);
+                }
+            }, 2000);
     
             isInCall = true;
             currentCallChatId = currentChatId;
