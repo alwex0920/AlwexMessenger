@@ -3425,12 +3425,12 @@
                 toast('Пользователь вышел', '', 'info');
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
-            } else if (data.type === 'call_offer') {
-                // Если мы не в звонке, показываем уведомление о входящем
-                if (!isInCall) {
-                    pendingOffer = data.offer;
-                    showIncomingCallModal();
-                }
+            } else if (data.type === 'call_offer' && !isInCall) {
+                alert('Входящий звонок! Нажмите OK, чтобы принять.');
+                await acceptCall(data.offer);
+                // pendingOffer = data.offer;
+                // showIncomingCallModal();
+
             } else if (data.type === 'call_answer') {
                 if (peerConnection) {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
