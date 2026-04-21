@@ -492,22 +492,24 @@
 
         @media (max-width: 480px) {
             .chat-head {
-                padding: 8px 12px;
-                gap: 8px;
+                padding: 6px 8px !important;
+                gap: 6px !important;
+            }
+            .chat-head img {
+                width: 32px !important;
+                height: 32px !important;
             }
             .chat-head-info {
-                flex: 1;
-                min-width: 0;
+                flex: 1 1 0 !important;
+                min-width: 0 !important;
             }
             .chat-head-name,
             .chat-head-status {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                font-size: 14px !important;
             }
             .icon-btn {
-                width: 36px;
-                height: 36px;
+                width: 32px !important;
+                height: 32px !important;
             }
         }
         
@@ -1708,11 +1710,10 @@
         }
     
         try {
-            // Сначала пробуем получить и видео, и аудио
+            // Пробуем получить и видео, и аудио
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             } catch (e) {
-                // Если не вышло (нет камеры или доступ запрещён), пробуем только аудио
                 if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
                     toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
                     localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
@@ -1725,26 +1726,44 @@
             document.getElementById('localVideo').srcObject = localStream;
     
             peerConnection = new RTCPeerConnection(rtcConfig);
-            // Таймаут на установку соединения (30 секунд)
+            
+            // Таймаут на установку соединения
             connectionTimeout = setTimeout(() => {
-                if (isInCall && (!peerConnection || peerConnection.iceConnectionState !== 'connected')) {
-                    toast('Соединение нестабильно', 'Проверьте интернет-соединение или попробуйте позже', 'warning');
+                if (isInCall && peerConnection && peerConnection.iceConnectionState !== 'connected' && peerConnection.iceConnectionState !== 'completed') {
+                    toast('Соединение нестабильно', 'Проверьте интернет-соединение', 'warning');
                 }
             }, 30000);
+    
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+    
             console.log('🎤 Audio tracks:', localStream.getAudioTracks().map(t => ({ label: t.label, enabled: t.enabled })));
             console.log('📹 Video tracks:', localStream.getVideoTracks().map(t => ({ label: t.label, enabled: t.enabled })));
     
+            // Обработчики состояния ICE
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'failed') {
+                    toast('Не удалось соединиться', 'Попробуйте перезапустить звонок', 'error');
+                }
+            };
+            peerConnection.onicegatheringstatechange = () => {
+                console.log('🧊 ICE gathering state:', peerConnection.iceGatheringState);
+            };
+            peerConnection.onsignalingstatechange = () => {
+                console.log('📡 Signaling state:', peerConnection.signalingState);
+            };
+    
             peerConnection.ontrack = (event) => {
                 console.log('🎵 Remote track received:', event.track.kind, event.track.label);
+                const remoteVideo = document.getElementById('remoteVideo');
+                remoteVideo.srcObject = event.streams[0];
+                remoteVideo.play().catch(e => console.warn('Autoplay prevented:', e));
                 if (event.track.kind === 'audio') {
                     console.log('🔊 Remote audio track ready');
-                    // Проверить уровень громкости можно только с AudioContext, но это уже сложнее
                 }
                 if (event.track.kind === 'video') {
                     console.log('🖥️ Remote video track ready');
                 }
-                document.getElementById('remoteVideo').srcObject = event.streams[0];
             };
     
             peerConnection.onicecandidate = (event) => {
@@ -1755,7 +1774,7 @@
     
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
-            console.log('📤 Sending call_offer:', offer);
+            console.log('📤 Sending call_offer, local SDP:', offer.sdp);
             sendSignalingMessage({ type: 'call_offer', offer: { type: offer.type, sdp: offer.sdp } });
     
             isInCall = true;
@@ -1765,6 +1784,7 @@
             toast('Ошибка', 'Не удалось получить доступ к микрофону', 'error');
         }
     }
+        
     async function acceptCall(offer) {
         try {
             try {
@@ -1783,24 +1803,40 @@
     
             peerConnection = new RTCPeerConnection(rtcConfig);
             connectionTimeout = setTimeout(() => {
-                if (isInCall && (!peerConnection || peerConnection.iceConnectionState !== 'connected')) {
+                if (isInCall && peerConnection && peerConnection.iceConnectionState !== 'connected' && peerConnection.iceConnectionState !== 'completed') {
                     toast('Соединение нестабильно', 'Проверьте интернет-соединение', 'warning');
                 }
             }, 30000);
+    
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+    
             console.log('🎤 Audio tracks:', localStream.getAudioTracks().map(t => ({ label: t.label, enabled: t.enabled })));
             console.log('📹 Video tracks:', localStream.getVideoTracks().map(t => ({ label: t.label, enabled: t.enabled })));
     
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'failed') {
+                    toast('Не удалось соединиться', 'Попробуйте перезапустить звонок', 'error');
+                }
+            };
+            peerConnection.onicegatheringstatechange = () => {
+                console.log('🧊 ICE gathering state:', peerConnection.iceGatheringState);
+            };
+            peerConnection.onsignalingstatechange = () => {
+                console.log('📡 Signaling state:', peerConnection.signalingState);
+            };
+    
             peerConnection.ontrack = (event) => {
                 console.log('🎵 Remote track received:', event.track.kind, event.track.label);
+                const remoteVideo = document.getElementById('remoteVideo');
+                remoteVideo.srcObject = event.streams[0];
+                remoteVideo.play().catch(e => console.warn('Autoplay prevented:', e));
                 if (event.track.kind === 'audio') {
                     console.log('🔊 Remote audio track ready');
-                    // Проверить уровень громкости можно только с AudioContext, но это уже сложнее
                 }
                 if (event.track.kind === 'video') {
                     console.log('🖥️ Remote video track ready');
                 }
-                document.getElementById('remoteVideo').srcObject = event.streams[0];
             };
     
             peerConnection.onicecandidate = (event) => {
@@ -1812,13 +1848,13 @@
             await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
-            
+            console.log('📤 Sending call_answer, local SDP:', answer.sdp);
             sendSignalingMessage({ type: 'call_answer', answer: answer });
     
             isInCall = true;
             currentCallChatId = currentChatId;
         } catch (err) {
-            console.error(err);
+            console.error('Ошибка принятия звонка:', err);
             toast('Ошибка', 'Не удалось принять звонок', 'error');
         }
     }
