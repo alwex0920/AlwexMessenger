@@ -1787,11 +1787,17 @@
             console.log('📤 Sending call_offer, local SDP:', offer.sdp);
             sendSignalingMessage({ type: 'call_offer', offer: { type: offer.type, sdp: offer.sdp } });
             let offerRetries = 0;
-            const offerInterval = setInterval(() => {
-                if (peerConnection && peerConnection.signalingState !== 'stable' && offerRetries < 3) {
-                    console.log('🔄 Resending call_offer, attempt', offerRetries + 1);
+            let offerInterval;
+            peerConnection.onsignalingstatechange = () => {
+                console.log('📡 Signaling state:', peerConnection.signalingState);
+                if (peerConnection.signalingState === 'stable') {
+                    clearInterval(offerInterval);
+                }
+            };
+            offerInterval = setInterval(() => {
+                if (peerConnection && peerConnection.signalingState === 'have-local-offer') {
+                    console.log('🔄 Resending call_offer');
                     sendSignalingMessage({ type: 'call_offer', offer: { type: peerConnection.localDescription.type, sdp: peerConnection.localDescription.sdp } });
-                    offerRetries++;
                 } else {
                     clearInterval(offerInterval);
                 }
@@ -3546,10 +3552,13 @@
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
             } else if (data.type === 'call_offer' && !isInCall) {
-                // alert('Входящий звонок! Нажмите OK, чтобы принять.');
-                // await acceptCall(data.offer);
-                pendingOffer = data.offer;
-                showIncomingCallModal();
+                if (peerConnection && peerConnection.signalingState !== 'stable') {
+                    // уже обрабатываем, игнорируем
+                    return;
+                } else {
+                    pendingOffer = data.offer;
+                    showIncomingCallModal();
+                }
 
             } else if (data.type === 'call_answer') {
                 if (peerConnection) {
