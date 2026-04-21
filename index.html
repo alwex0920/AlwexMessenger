@@ -1643,54 +1643,59 @@
         }
     
         try {
-            // Запрашиваем доступ к камере и микрофону
-            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            
-            // Показываем локальное видео (можно в модальном окне)
+            // Сначала пробуем получить и видео, и аудио
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            } catch (e) {
+                // Если не вышло (нет камеры или доступ запрещён), пробуем только аудио
+                if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
+                    toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                } else {
+                    throw e;
+                }
+            }
+    
             showCallModal();
             document.getElementById('localVideo').srcObject = localStream;
     
-            // Создаём peer connection
             peerConnection = new RTCPeerConnection(rtcConfig);
-            
-            // Добавляем локальные треки
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
     
-            // Обработчик удалённого трека
             peerConnection.ontrack = (event) => {
                 document.getElementById('remoteVideo').srcObject = event.streams[0];
             };
     
-            // Обработчик ICE-кандидатов
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    sendSignalingMessage({
-                        type: 'ice_candidate',
-                        candidate: event.candidate
-                    });
+                    sendSignalingMessage({ type: 'ice_candidate', candidate: event.candidate });
                 }
             };
     
-            // Создаём offer
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
-            
-            sendSignalingMessage({
-                type: 'call_offer',
-                offer: offer
-            });
+            sendSignalingMessage({ type: 'call_offer', offer: offer });
     
             isInCall = true;
             currentCallChatId = currentChatId;
         } catch (err) {
             console.error('Ошибка начала звонка:', err);
-            toast('Ошибка', 'Не удалось получить доступ к камере/микрофону', 'error');
+            toast('Ошибка', 'Не удалось получить доступ к микрофону', 'error');
         }
     }
-
     async function acceptCall(offer) {
         try {
-            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            } catch (e) {
+                if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
+                    toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                } else {
+                    throw e;
+                }
+            }
+    
             showCallModal();
             document.getElementById('localVideo').srcObject = localStream;
     
