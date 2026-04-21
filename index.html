@@ -1756,8 +1756,11 @@
             peerConnection.ontrack = (event) => {
                 console.log('🎵 Remote track received:', event.track.kind, event.track.label);
                 const remoteVideo = document.getElementById('remoteVideo');
-                remoteVideo.srcObject = event.streams[0];
-                remoteVideo.play().catch(e => console.warn('Autoplay prevented:', e));
+                // Не пересоздаём поток, если он уже есть, а добавляем треки
+                if (!remoteVideo.srcObject) {
+                    remoteVideo.srcObject = event.streams[0];
+                }
+                // Не вызываем play() явно, полагаемся на autoplay
                 if (event.track.kind === 'audio') {
                     console.log('🔊 Remote audio track ready');
                 }
@@ -1829,8 +1832,11 @@
             peerConnection.ontrack = (event) => {
                 console.log('🎵 Remote track received:', event.track.kind, event.track.label);
                 const remoteVideo = document.getElementById('remoteVideo');
-                remoteVideo.srcObject = event.streams[0];
-                remoteVideo.play().catch(e => console.warn('Autoplay prevented:', e));
+                // Не пересоздаём поток, если он уже есть, а добавляем треки
+                if (!remoteVideo.srcObject) {
+                    remoteVideo.srcObject = event.streams[0];
+                }
+                // Не вызываем play() явно, полагаемся на autoplay
                 if (event.track.kind === 'audio') {
                     console.log('🔊 Remote audio track ready');
                 }
