@@ -489,6 +489,27 @@
             white-space: nowrap;
             min-width: 0;
         }
+
+        @media (max-width: 480px) {
+            .chat-head {
+                padding: 8px 12px;
+                gap: 8px;
+            }
+            .chat-head-info {
+                flex: 1;
+                min-width: 0;
+            }
+            .chat-head-name,
+            .chat-head-status {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .icon-btn {
+                width: 36px;
+                height: 36px;
+            }
+        }
         
         @media (max-width: 768px) {
             #pinnedMessageBar {
@@ -1711,8 +1732,18 @@
                 }
             }, 30000);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            console.log('🎤 Audio tracks:', localStream.getAudioTracks().map(t => ({ label: t.label, enabled: t.enabled })));
+            console.log('📹 Video tracks:', localStream.getVideoTracks().map(t => ({ label: t.label, enabled: t.enabled })));
     
             peerConnection.ontrack = (event) => {
+                console.log('🎵 Remote track received:', event.track.kind, event.track.label);
+                if (event.track.kind === 'audio') {
+                    console.log('🔊 Remote audio track ready');
+                    // Проверить уровень громкости можно только с AudioContext, но это уже сложнее
+                }
+                if (event.track.kind === 'video') {
+                    console.log('🖥️ Remote video track ready');
+                }
                 document.getElementById('remoteVideo').srcObject = event.streams[0];
             };
     
@@ -1757,8 +1788,18 @@
                 }
             }, 30000);
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            console.log('🎤 Audio tracks:', localStream.getAudioTracks().map(t => ({ label: t.label, enabled: t.enabled })));
+            console.log('📹 Video tracks:', localStream.getVideoTracks().map(t => ({ label: t.label, enabled: t.enabled })));
     
             peerConnection.ontrack = (event) => {
+                console.log('🎵 Remote track received:', event.track.kind, event.track.label);
+                if (event.track.kind === 'audio') {
+                    console.log('🔊 Remote audio track ready');
+                    // Проверить уровень громкости можно только с AudioContext, но это уже сложнее
+                }
+                if (event.track.kind === 'video') {
+                    console.log('🖥️ Remote video track ready');
+                }
                 document.getElementById('remoteVideo').srcObject = event.streams[0];
             };
     
