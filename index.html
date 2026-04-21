@@ -1211,8 +1211,9 @@
     </div>
     <div class="modal" id="callModal">
         <div class="modal-box" style="max-width: 800px;">
-            <div class="modal-head">
-                <h2>Звонок</h2>
+            <div class="modal-head" style="display: flex; align-items: center; gap: 12px;">
+                <img id="callAvatar" src="" style="width: 40px; height: 40px; border-radius: 50%;">
+                <h2 id="callTitle" style="flex: 1;">Звонок</h2>
                 <button class="icon-btn ripple" onclick="endCall()">✖</button>
             </div>
             <div class="modal-body" style="display: flex; gap: 16px;">
@@ -1580,7 +1581,11 @@
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
-            // можно добавить бесплатный TURN для надёжности
+            {
+                urls: 'turn:global.metered.ca:443?transport=tcp',
+                username: '9f2c5b1e4d3a2c1b0e9f8d7c',
+                credential: '6b5a4c3d2e1f0a9b8c7d6e5f'
+            }
         ]
     };
 
@@ -1766,6 +1771,15 @@
     }
 
     function showCallModal() {
+        const callAvatar = document.getElementById('callAvatar');
+        const callTitle = document.getElementById('callTitle');
+        if (currentChat && currentChatType === 'direct') {
+            callAvatar.src = currentChat.avatar || '';
+            callTitle.textContent = currentChat.displayName || currentChat.username || 'Собеседник';
+        } else {
+            callAvatar.src = '';
+            callTitle.textContent = 'Звонок';
+        }
         document.getElementById('callModal').classList.add('show');
     }
     function hideCallModal() {
@@ -2189,7 +2203,7 @@
         } catch (e) {
             clearTimeout(timeoutId);
             if (e.name === 'AbortError') {
-                toast('Ошибка', 'Превышено время ожидания. Проверьте соединение.', 'error');
+                console.warn('API timeout:', path);
                 return { error: 'Timeout' };
             }
             toast('Ошибка сети', 'Не удалось связаться с сервером', 'error');
