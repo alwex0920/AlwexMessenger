@@ -1653,7 +1653,8 @@
                 username: '000000002092120231',
                 credential: 'jPQk+CxIww0eVi3YiN20OuEjnw8='
             }
-        ]
+        ],
+        iceTransportPolicy: 'relay'  // только TURN
     };
 
     document.addEventListener('click', async (e) => {
@@ -1778,6 +1779,7 @@
                 if (event.candidate) {
                     sendSignalingMessage({ type: 'ice_candidate', candidate: event.candidate });
                 }
+                console.log('📦 Local ICE candidate:', event.candidate);
             };
     
             const offer = await peerConnection.createOffer();
@@ -1854,6 +1856,7 @@
                 if (event.candidate) {
                     sendSignalingMessage({ type: 'ice_candidate', candidate: event.candidate });
                 }
+                console.log('📦 Remote ICE candidate:', event.candidate);
             };
     
             await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
@@ -3543,6 +3546,7 @@
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
                 }
             } else if (data.type === 'ice_candidate') {
+                console.log('📦 Received remote ICE candidate:', data.candidate);
                 if (peerConnection && data.candidate) {
                     await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
                 }
