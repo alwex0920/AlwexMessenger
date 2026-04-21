@@ -1663,7 +1663,7 @@
                 credential: "wYEK0cNfALIePvGx",
             }
         ],
-        iceTransportPolicy: 'all'  // можно оставить 'all', TURN будет использоваться при необходимости
+        iceTransportPolicy: 'relay'  // можно оставить 'all', TURN будет использоваться при необходимости
     };
 
     document.addEventListener('click', async (e) => {
@@ -3561,13 +3561,19 @@
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
             } else if (data.type === 'call_offer' && !isInCall) {
-                if (peerConnection && peerConnection.signalingState !== 'stable') {
-                    // уже обрабатываем, игнорируем
-                    return;
-                } else {
+                } else if (data.type === 'call_offer') {
+                    console.log('📞 Incoming call_offer, isInCall:', isInCall);
+                    if (isInCall) {
+                        // Уже в звонке, отправляем сигнал занято (опционально)
+                        // sendSignalingMessage({ type: 'call_busy' });
+                        return;
+                    }
+                    if (peerConnection) {
+                        // Уже обрабатываем другое предложение
+                        return;
+                    }
                     pendingOffer = data.offer;
                     showIncomingCallModal();
-                }
 
             } else if (data.type === 'call_answer') {
                 if (peerConnection) {
