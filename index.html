@@ -1784,6 +1784,7 @@
 
     function sendSignalingMessage(payload) {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        console.log('📤 Sending signaling message:', payload.type);
         ws.send(JSON.stringify(payload));
     }
 
@@ -3426,10 +3427,10 @@
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
             } else if (data.type === 'call_offer' && !isInCall) {
-                alert('Входящий звонок! Нажмите OK, чтобы принять.');
-                await acceptCall(data.offer);
-                // pendingOffer = data.offer;
-                // showIncomingCallModal();
+                // alert('Входящий звонок! Нажмите OK, чтобы принять.');
+                // await acceptCall(data.offer);
+                pendingOffer = data.offer;
+                showIncomingCallModal();
 
             } else if (data.type === 'call_answer') {
                 if (peerConnection) {
