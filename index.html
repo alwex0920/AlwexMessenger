@@ -3901,6 +3901,31 @@
         await loadProfile();
         await loadChats();
         startPolling();
+        const urlParams = new URLSearchParams(window.location.search);
+        const incomingCallChatId = urlParams.get('call');
+        if (incomingCallChatId) {
+            // Очищаем параметр из URL, чтобы не мешал при обновлении
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            // Открываем чат с пользователем
+            await openDirectChat(parseInt(incomingCallChatId));
+            
+            // Если звонок уже ожидает (pendingOffer), принимаем его
+            if (pendingOffer) {
+                await acceptCall(pendingOffer);
+                pendingOffer = null;
+            } else {
+                // Если предложение ещё не пришло, ждём его 5 секунд
+                const waitForOffer = setInterval(() => {
+                    if (pendingOffer) {
+                        clearInterval(waitForOffer);
+                        acceptCall(pendingOffer);
+                        pendingOffer = null;
+                    }
+                }, 500);
+                setTimeout(() => clearInterval(waitForOffer), 5000);
+            }
+        }
         toast('Добро пожаловать!', 'Привет, ' + (user.displayName || user.username) + '!', 'success');
         const userId = user.id; // из ответа сервера
         localStorage.setItem('alwex_user_id', userId);
