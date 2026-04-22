@@ -278,6 +278,42 @@
             .chat-head-back{display:flex}
             .message{max-width:85%}
             .modal-box{max-width:100%;max-height:100%;border-radius:0}
+            /* Шапка чата */
+            .chat-head {
+                padding: 8px 10px !important;
+                gap: 6px !important;
+                flex-wrap: nowrap;
+            }
+        
+            .chat-head img {
+                width: 32px !important;
+                height: 32px !important;
+            }
+        
+            .chat-head-info {
+                flex: 1 1 0 !important;
+                min-width: 0 !important;
+                overflow: hidden !important;
+            }
+        
+            .chat-head-name {
+                font-size: 14px !important;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+        
+            .chat-head-status {
+                font-size: 11px !important;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+        
+            .icon-btn {
+                width: 32px !important;
+                height: 32px !important;
+            }
         }
         
         /* Toast */
@@ -1795,22 +1831,6 @@
             await peerConnection.setLocalDescription(offer);
             console.log('📤 Sending call_offer, local SDP:', offer.sdp);
             sendSignalingMessage({ type: 'call_offer', offer: { type: offer.type, sdp: offer.sdp } });
-            let offerRetries = 0;
-            let offerInterval;
-            peerConnection.onsignalingstatechange = () => {
-                console.log('📡 Signaling state:', peerConnection.signalingState);
-                if (peerConnection.signalingState === 'stable') {
-                    clearInterval(offerInterval);
-                }
-            };
-            offerInterval = setInterval(() => {
-                if (peerConnection && peerConnection.signalingState === 'have-local-offer') {
-                    console.log('🔄 Resending call_offer');
-                    sendSignalingMessage({ type: 'call_offer', offer: { type: peerConnection.localDescription.type, sdp: peerConnection.localDescription.sdp } });
-                } else {
-                    clearInterval(offerInterval);
-                }
-            }, 2000);
     
             isInCall = true;
             currentCallChatId = currentChatId;
@@ -1923,11 +1943,19 @@
     }
 
     async function endCall() {
+        if (!isInCall && !peerConnection) return; // уже завершён
+        
         if (connectionTimeout) {
             clearTimeout(connectionTimeout);
             connectionTimeout = null;
         }
         if (peerConnection) {
+            // Отключаем обработчики, чтобы избежать утечек
+            peerConnection.oniceconnectionstatechange = null;
+            peerConnection.onicegatheringstatechange = null;
+            peerConnection.onsignalingstatechange = null;
+            peerConnection.ontrack = null;
+            peerConnection.onicecandidate = null;
             peerConnection.close();
             peerConnection = null;
         }
@@ -1936,10 +1964,15 @@
             localStream = null;
         }
         hideCallModal();
-        isInCall = false;
+        hideIncomingCallModal(); // на всякий случай
         
-        // Уведомляем собеседника
-        sendSignalingMessage({ type: 'call_end' });
+        // Отправляем call_end только если до этого был активен звонок
+        if (isInCall) {
+            sendSignalingMessage({ type: 'call_end' });
+        }
+        
+        isInCall = false;
+        currentCallChatId = null;
     }
 
     function showCallModal() {
@@ -3584,17 +3617,15 @@
                     await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
                 }
             } else if (data.type === 'call_end') {
-                endCall();
+                console.log('📴 Received call_end');
+                if (isInCall) {
+                    endCall();
+                }
             }
         };
     
         ws.onclose = (event) => {
             console.log('WebSocket closed', event.code, event.reason);
-            // Очищаем интервал при закрытии
-            if (pingInterval) {
-                clearInterval(pingInterval);
-                pingInterval = null;
-            }
             ws = null;
             // Переподключение через 3 секунды
             if (currentChatId) {
