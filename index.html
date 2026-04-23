@@ -1712,29 +1712,19 @@
     let connectionTimeout = null;
     const rtcConfig = {
         iceServers: [
-            { urls: "stun:stun.relay.metered.ca:80" },
+            { urls: 'stun:stun.cloudflare.com:3478' },
             {
-                urls: "turn:global.relay.metered.ca:80",
-                username: "63e49bcccd5b425f9def1ff7",
-                credential: "wYEK0cNfALIePvGx",
+                urls: 'turn:stun.cloudflare.com:3478?transport=udp',
+                username: 'alwex',
+                credential: 'messenger2025'
             },
             {
-                urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                username: "63e49bcccd5b425f9def1ff7",
-                credential: "wYEK0cNfALIePvGx",
-            },
-            {
-                urls: "turn:global.relay.metered.ca:443",
-                username: "63e49bcccd5b425f9def1ff7",
-                credential: "wYEK0cNfALIePvGx",
-            },
-            {
-                urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                username: "63e49bcccd5b425f9def1ff7",
-                credential: "wYEK0cNfALIePvGx",
+                urls: 'turn:stun.cloudflare.com:3478?transport=tcp',
+                username: 'alwex',
+                credential: 'messenger2025'
             }
         ],
-        iceTransportPolicy: 'relay'  // можно оставить 'all', TURN будет использоваться при необходимости
+        iceTransportPolicy: 'all' // сначала попробуем прямое соединение, затем TURN
     };
 
     document.addEventListener('click', async (e) => {
