@@ -1812,6 +1812,16 @@
             document.getElementById('localVideo').srcObject = localStream;
     
             peerConnection = new RTCPeerConnection(rtcConfig);
+
+            peerConnection.onconnectionstatechange = () => {
+                console.log('🔗 Connection state:', peerConnection.connectionState);
+            };
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
+                    console.log('✅ Медиа соединение установлено, должен пойти звук/видео');
+                }
+            };
             
             // Таймаут на установку соединения
             connectionTimeout = setTimeout(() => {
@@ -1846,7 +1856,9 @@
                 if (!remoteVideo.srcObject) {
                     remoteVideo.srcObject = event.streams[0];
                 }
-                // Не вызываем play() явно, полагаемся на autoplay
+                // Принудительное воспроизведение для обхода политики автозапуска
+                remoteVideo.play().catch(e => console.warn('Autoplay prevented, trying again:', e));
+                
                 if (event.track.kind === 'audio') {
                     console.log('🔊 Remote audio track ready');
                 }
@@ -1892,6 +1904,15 @@
             document.getElementById('localVideo').srcObject = localStream;
     
             peerConnection = new RTCPeerConnection(rtcConfig);
+            peerConnection.onconnectionstatechange = () => {
+                console.log('🔗 Connection state:', peerConnection.connectionState);
+            };
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
+                    console.log('✅ Медиа соединение установлено, должен пойти звук/видео');
+                }
+            };
             connectionTimeout = setTimeout(() => {
                 if (isInCall && peerConnection && peerConnection.iceConnectionState !== 'connected' && peerConnection.iceConnectionState !== 'completed') {
                     toast('Соединение нестабильно', 'Проверьте интернет-соединение', 'warning');
@@ -1923,7 +1944,9 @@
                 if (!remoteVideo.srcObject) {
                     remoteVideo.srcObject = event.streams[0];
                 }
-                // Не вызываем play() явно, полагаемся на autoplay
+                // Принудительное воспроизведение для обхода политики автозапуска
+                remoteVideo.play().catch(e => console.warn('Autoplay prevented, trying again:', e));
+                
                 if (event.track.kind === 'audio') {
                     console.log('🔊 Remote audio track ready');
                 }
