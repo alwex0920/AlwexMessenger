@@ -1829,6 +1829,13 @@
                     toast('Соединение нестабильно', 'Проверьте интернет-соединение', 'warning');
                 }
             }, 30000);
+            const iceTimeout = setTimeout(() => {
+                if (peerConnection && peerConnection.iceConnectionState !== 'connected' && peerConnection.iceConnectionState !== 'completed') {
+                    console.error('ICE timeout, state:', peerConnection.iceConnectionState);
+                    toast('Не удалось соединиться', 'Попробуйте перезвонить', 'error');
+                    endCall(false);
+                }
+            }, 15000);
     
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
     
@@ -1838,6 +1845,9 @@
             // Обработчики состояния ICE
             peerConnection.oniceconnectionstatechange = () => {
                 console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
+                    clearTimeout(iceTimeout);
+                }
                 if (peerConnection.iceConnectionState === 'failed') {
                     toast('Не удалось соединиться', 'Попробуйте перезапустить звонок', 'error');
                 }
