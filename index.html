@@ -1712,19 +1712,29 @@
     let connectionTimeout = null;
     const rtcConfig = {
         iceServers: [
-            { urls: 'stun:stun.cloudflare.com:3478' },
+            { urls: "stun:stun.relay.metered.ca:80" },
             {
-                urls: 'turn:stun.cloudflare.com:3478?transport=udp',
-                username: 'alwex',
-                credential: 'messenger2025'
+                urls: "turn:global.relay.metered.ca:80",
+                username: "63e49bcccd5b425f9def1ff7",
+                credential: "wYEK0cNfALIePvGx",
             },
             {
-                urls: 'turn:stun.cloudflare.com:3478?transport=tcp',
-                username: 'alwex',
-                credential: 'messenger2025'
+                urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                username: "63e49bcccd5b425f9def1ff7",
+                credential: "wYEK0cNfALIePvGx",
+            },
+            {
+                urls: "turn:global.relay.metered.ca:443",
+                username: "63e49bcccd5b425f9def1ff7",
+                credential: "wYEK0cNfALIePvGx",
+            },
+            {
+                urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                username: "63e49bcccd5b425f9def1ff7",
+                credential: "wYEK0cNfALIePvGx",
             }
         ],
-        iceTransportPolicy: 'all' // сначала попробуем прямое соединение, затем TURN
+        iceTransportPolicy: 'all'
     };
 
     document.addEventListener('click', async (e) => {
@@ -1852,12 +1862,29 @@
             peerConnection.ontrack = (event) => {
                 console.log('🎵 Remote track received:', event.track.kind, event.track.label);
                 const remoteVideo = document.getElementById('remoteVideo');
-                // Не пересоздаём поток, если он уже есть, а добавляем треки
+                
+                // Обязательно снимаем muted и включаем звук
+                remoteVideo.muted = false;
+                remoteVideo.volume = 1.0;
+                
                 if (!remoteVideo.srcObject) {
                     remoteVideo.srcObject = event.streams[0];
+                    remoteVideo.onloadedmetadata = () => {
+                        console.log('Video metadata loaded, videoWidth:', remoteVideo.videoWidth);
+                    };
                 }
-                // Принудительное воспроизведение для обхода политики автозапуска
-                remoteVideo.play().catch(e => console.warn('Autoplay prevented, trying again:', e));
+                
+                // Явный вызов play() с обработкой ошибки
+                remoteVideo.play().then(() => {
+                    console.log('Playback started successfully');
+                }).catch(e => {
+                    console.error('Play error:', e);
+                    // Если ошибка автозапуска, показываем кнопку Play поверх видео
+                    if (e.name === 'NotAllowedError') {
+                        toast('Нажмите кнопку Play', 'Браузер требует взаимодействия', 'info');
+                        // Добавляем кастомную кнопку Play (можно показать модально)
+                    }
+                });
                 
                 if (event.track.kind === 'audio') {
                     console.log('🔊 Remote audio track ready');
@@ -1940,12 +1967,29 @@
             peerConnection.ontrack = (event) => {
                 console.log('🎵 Remote track received:', event.track.kind, event.track.label);
                 const remoteVideo = document.getElementById('remoteVideo');
-                // Не пересоздаём поток, если он уже есть, а добавляем треки
+                
+                // Обязательно снимаем muted и включаем звук
+                remoteVideo.muted = false;
+                remoteVideo.volume = 1.0;
+                
                 if (!remoteVideo.srcObject) {
                     remoteVideo.srcObject = event.streams[0];
+                    remoteVideo.onloadedmetadata = () => {
+                        console.log('Video metadata loaded, videoWidth:', remoteVideo.videoWidth);
+                    };
                 }
-                // Принудительное воспроизведение для обхода политики автозапуска
-                remoteVideo.play().catch(e => console.warn('Autoplay prevented, trying again:', e));
+                
+                // Явный вызов play() с обработкой ошибки
+                remoteVideo.play().then(() => {
+                    console.log('Playback started successfully');
+                }).catch(e => {
+                    console.error('Play error:', e);
+                    // Если ошибка автозапуска, показываем кнопку Play поверх видео
+                    if (e.name === 'NotAllowedError') {
+                        toast('Нажмите кнопку Play', 'Браузер требует взаимодействия', 'info');
+                        // Добавляем кастомную кнопку Play (можно показать модально)
+                    }
+                });
                 
                 if (event.track.kind === 'audio') {
                     console.log('🔊 Remote audio track ready');
