@@ -1712,19 +1712,30 @@
     let connectionTimeout = null;
     const rtcConfig = {
         iceServers: [
-            { urls: 'stun:stun.cloudflare.com:3478' },
+            // STUN от Google (работает всегда)
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            
+            // Metered TURN (ваш предыдущий, но без relay-принуждения)
             {
-                urls: 'turn:stun.cloudflare.com:3478?transport=udp',
-                username: 'alwex',
-                credential: 'messenger2025'
+                urls: 'turn:global.relay.metered.ca:80',
+                username: '63e49bcccd5b425f9def1ff7',
+                credential: 'wYEK0cNfALIePvGx',
             },
             {
-                urls: 'turn:stun.cloudflare.com:3478?transport=tcp',
-                username: 'alwex',
-                credential: 'messenger2025'
+                urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+                username: '63e49bcccd5b425f9def1ff7',
+                credential: 'wYEK0cNfALIePvGx',
+            },
+            
+            // Резервный TURN от expressTurn (с IP-адресом для обхода DNS)
+            {
+                urls: 'turn:159.69.219.141:3478?transport=udp',
+                username: '000000002092120231',
+                credential: 'jPQk+CxIww0eVi3YiN20OuEjnw8='
             }
         ],
-        iceTransportPolicy: 'relay'  // принудительно только TURN на время теста
+        iceTransportPolicy: 'all' // Разрешаем и прямое, и relay-соединения
     };
 
     document.addEventListener('click', async (e) => {
