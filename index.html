@@ -1848,9 +1848,6 @@
             peerConnection.onsignalingstatechange = () => {
                 console.log('📡 Signaling state:', peerConnection.signalingState);
             };
-            peerConnection.onicecandidateerror = (event) => {
-                console.error('❌ ICE candidate error:', event.errorText, 'for URL:', event.url);
-            };
     
             peerConnection.ontrack = (event) => {
                 console.log('🎵 Remote track received:', event.track.kind, event.track.label);
@@ -1955,9 +1952,6 @@
             };
             peerConnection.onsignalingstatechange = () => {
                 console.log('📡 Signaling state:', peerConnection.signalingState);
-            };
-            peerConnection.onicecandidateerror = (event) => {
-                console.error('❌ ICE candidate error:', event.errorText, 'for URL:', event.url);
             };
     
             peerConnection.ontrack = (event) => {
