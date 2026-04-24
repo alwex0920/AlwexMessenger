@@ -645,6 +645,7 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+    <script src="https://unpkg.com/@cloudflare/realtimekit@latest/dist/index.js"></script>
 </head>
 <body>
     <div class="toast-box" id="toasts"></div>
@@ -1704,12 +1705,7 @@
     let replyToId = null;          // ID сообщения, на которое отвечаем
     let replyToContent = '';       // текст для отображения в плашке
     let messagesById = {}; // словарь всех загруженных сообщений по id
-    let localStream = null;
-    let peerConnection = null;
-    let isInCall = false;
-    let currentCallChatId = null;
-    let pendingOffer = null; // для хранения offer'а входящего звонка
-    let connectionTimeout = null;
+    let currentCall = null; // объект комнаты RealtimeKit
     const rtcConfig = {
         iceServers: [
             // STUN от Google – пробуем через стандартный порт
@@ -1783,239 +1779,64 @@
             toast('Звонки', 'Пока только в личных чатах', 'info');
             return;
         }
-        if (isInCall) {
+        if (currentCall) {
             toast('Звонок уже активен', '', 'warning');
             return;
         }
     
         try {
-            // Пробуем получить и видео, и аудио
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            } catch (e) {
-                if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
-                    toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
-                    localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-                } else {
-                    throw e;
-                }
+            const res = await api('/api/calls/new', {
+                method: 'POST',
+                body: { recipientId: currentChat.id }
+            });
+            if (res.error) {
+                toast('Ошибка', res.error, 'error');
+                return;
             }
     
-            showCallModal();
-            document.getElementById('localVideo').srcObject = localStream;
+            // Сохраняем sessionId и отправляем собеседнику через WebSocket
+            const sessionId = res.sessionId;
+            sendSignalingMessage({ type: 'realtime_call', sessionId });
     
-            peerConnection = new RTCPeerConnection(rtcConfig);
-
-            peerConnection.onconnectionstatechange = () => {
-                console.log('🔗 Connection state:', peerConnection.connectionState);
-            };
-            peerConnection.oniceconnectionstatechange = () => {
-                console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
-                if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
-                    console.log('✅ Медиа соединение установлено, должен пойти звук/видео');
-                }
-            };
-            
-            // Таймаут на установку соединения
-            connectionTimeout = setTimeout(() => {
-                if (isInCall && peerConnection && peerConnection.iceConnectionState !== 'connected' && peerConnection.iceConnectionState !== 'completed') {
-                    toast('Соединение нестабильно', 'Проверьте интернет-соединение', 'warning');
-                }
-            }, 30000);
-            const iceTimeout = setTimeout(() => {
-                if (peerConnection && peerConnection.iceConnectionState !== 'connected' && peerConnection.iceConnectionState !== 'completed') {
-                    console.error('ICE timeout, state:', peerConnection.iceConnectionState);
-                    toast('Не удалось соединиться', 'Попробуйте перезвонить', 'error');
-                    endCall(false);
-                }
-            }, 15000);
-    
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-    
-            console.log('🎤 Audio tracks:', localStream.getAudioTracks().map(t => ({ label: t.label, enabled: t.enabled })));
-            console.log('📹 Video tracks:', localStream.getVideoTracks().map(t => ({ label: t.label, enabled: t.enabled })));
-    
-            // Обработчики состояния ICE
-            peerConnection.oniceconnectionstatechange = () => {
-                console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
-                if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
-                    clearTimeout(iceTimeout);
-                }
-                if (peerConnection.iceConnectionState === 'failed') {
-                    toast('Не удалось соединиться', 'Попробуйте перезапустить звонок', 'error');
-                }
-            };
-            peerConnection.onicegatheringstatechange = () => {
-                console.log('🧊 ICE gathering state:', peerConnection.iceGatheringState);
-            };
-            peerConnection.onsignalingstatechange = () => {
-                console.log('📡 Signaling state:', peerConnection.signalingState);
-            };
-            peerConnection.onicecandidateerror = (event) => {
-                console.error('❌ ICE candidate error:', event.errorText, 'for URL:', event.url);
-            };
-    
-            peerConnection.ontrack = (event) => {
-                console.log('🎵 Remote track received:', event.track.kind, event.track.label);
-                const remoteVideo = document.getElementById('remoteVideo');
-                
-                // Обязательно снимаем muted и включаем звук
-                remoteVideo.muted = false;
-                remoteVideo.volume = 1.0;
-                
-                if (!remoteVideo.srcObject) {
-                    remoteVideo.srcObject = event.streams[0];
-                    remoteVideo.onloadedmetadata = () => {
-                        console.log('Video metadata loaded, videoWidth:', remoteVideo.videoWidth);
-                    };
-                }
-                
-                // Явный вызов play() с обработкой ошибки
-                remoteVideo.play().then(() => {
-                    console.log('Playback started successfully');
-                }).catch(e => {
-                    console.error('Play error:', e);
-                    // Если ошибка автозапуска, показываем кнопку Play поверх видео
-                    if (e.name === 'NotAllowedError') {
-                        toast('Нажмите кнопку Play', 'Браузер требует взаимодействия', 'info');
-                        // Добавляем кастомную кнопку Play (можно показать модально)
-                    }
-                });
-                
-                if (event.track.kind === 'audio') {
-                    console.log('🔊 Remote audio track ready');
-                }
-                if (event.track.kind === 'video') {
-                    console.log('🖥️ Remote video track ready');
-                }
-            };
-    
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    sendSignalingMessage({ type: 'ice_candidate', candidate: event.candidate });
-                }
-                console.log('📦 Local ICE candidate:', event.candidate);
-            };
-    
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            console.log('📤 Sending call_offer, local SDP:', offer.sdp);
-            sendSignalingMessage({ type: 'call_offer', offer: { type: offer.type, sdp: offer.sdp } });
-    
-            isInCall = true;
-            currentCallChatId = currentChatId;
+            // Подключаемся к комнате
+            await joinCall(sessionId, res.joinUrl);
         } catch (err) {
             console.error('Ошибка начала звонка:', err);
-            toast('Ошибка', 'Не удалось получить доступ к микрофону', 'error');
+            toast('Ошибка', 'Не удалось начать звонок', 'error');
         }
     }
-        
-    async function acceptCall(offer) {
-        try {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            } catch (e) {
-                if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
-                    toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
-                    localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-                } else {
-                    throw e;
-                }
-            }
     
+    async function joinCall(sessionId, joinUrl) {
+        try {
+            const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             showCallModal();
             document.getElementById('localVideo').srcObject = localStream;
     
-            peerConnection = new RTCPeerConnection(rtcConfig);
-            peerConnection.onconnectionstatechange = () => {
-                console.log('🔗 Connection state:', peerConnection.connectionState);
-            };
-            peerConnection.oniceconnectionstatechange = () => {
-                console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
-                if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
-                    console.log('✅ Медиа соединение установлено, должен пойти звук/видео');
-                }
-            };
-            connectionTimeout = setTimeout(() => {
-                if (isInCall && peerConnection && peerConnection.iceConnectionState !== 'connected' && peerConnection.iceConnectionState !== 'completed') {
-                    toast('Соединение нестабильно', 'Проверьте интернет-соединение', 'warning');
-                }
-            }, 30000);
+            currentCall = new CloudflareRealtimeKit.Room(sessionId, {
+                token: joinUrl,
+                stream: localStream
+            });
     
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            currentCall.on('participantConnected', (participant) => {
+                console.log('Участник подключился:', participant);
+                document.getElementById('remoteVideo').srcObject = participant.stream;
+            });
     
-            console.log('🎤 Audio tracks:', localStream.getAudioTracks().map(t => ({ label: t.label, enabled: t.enabled })));
-            console.log('📹 Video tracks:', localStream.getVideoTracks().map(t => ({ label: t.label, enabled: t.enabled })));
+            currentCall.on('participantDisconnected', (participant) => {
+                console.log('Участник отключился:', participant);
+                endCall();
+            });
     
-            peerConnection.oniceconnectionstatechange = () => {
-                console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
-                if (peerConnection.iceConnectionState === 'failed') {
-                    toast('Не удалось соединиться', 'Попробуйте перезапустить звонок', 'error');
-                }
-            };
-            peerConnection.onicegatheringstatechange = () => {
-                console.log('🧊 ICE gathering state:', peerConnection.iceGatheringState);
-            };
-            peerConnection.onsignalingstatechange = () => {
-                console.log('📡 Signaling state:', peerConnection.signalingState);
-            };
-            peerConnection.onicecandidateerror = (event) => {
-                console.error('❌ ICE candidate error:', event.errorText, 'for URL:', event.url);
-            };
+            currentCall.on('error', (error) => {
+                console.error('Ошибка комнаты:', error);
+                toast('Ошибка звонка', error.message, 'error');
+                endCall();
+            });
     
-            peerConnection.ontrack = (event) => {
-                console.log('🎵 Remote track received:', event.track.kind, event.track.label);
-                const remoteVideo = document.getElementById('remoteVideo');
-                
-                // Обязательно снимаем muted и включаем звук
-                remoteVideo.muted = false;
-                remoteVideo.volume = 1.0;
-                
-                if (!remoteVideo.srcObject) {
-                    remoteVideo.srcObject = event.streams[0];
-                    remoteVideo.onloadedmetadata = () => {
-                        console.log('Video metadata loaded, videoWidth:', remoteVideo.videoWidth);
-                    };
-                }
-                
-                // Явный вызов play() с обработкой ошибки
-                remoteVideo.play().then(() => {
-                    console.log('Playback started successfully');
-                }).catch(e => {
-                    console.error('Play error:', e);
-                    // Если ошибка автозапуска, показываем кнопку Play поверх видео
-                    if (e.name === 'NotAllowedError') {
-                        toast('Нажмите кнопку Play', 'Браузер требует взаимодействия', 'info');
-                        // Добавляем кастомную кнопку Play (можно показать модально)
-                    }
-                });
-                
-                if (event.track.kind === 'audio') {
-                    console.log('🔊 Remote audio track ready');
-                }
-                if (event.track.kind === 'video') {
-                    console.log('🖥️ Remote video track ready');
-                }
-            };
-    
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    sendSignalingMessage({ type: 'ice_candidate', candidate: event.candidate });
-                }
-                console.log('📦 Remote ICE candidate:', event.candidate);
-            };
-    
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            console.log('📤 Sending call_answer, local SDP:', answer.sdp);
-            sendSignalingMessage({ type: 'call_answer', answer: answer });
-    
-            isInCall = true;
-            currentCallChatId = currentChatId;
+            await currentCall.join();
         } catch (err) {
-            console.error('Ошибка принятия звонка:', err);
-            toast('Ошибка', 'Не удалось принять звонок', 'error');
+            console.error('Ошибка подключения к звонку:', err);
+            toast('Ошибка', 'Не удалось получить доступ к камере/микрофону', 'error');
         }
     }
         
@@ -2044,36 +1865,17 @@
     }
 
     async function endCall() {
-        if (!isInCall && !peerConnection) return; // уже завершён
-        
-        if (connectionTimeout) {
-            clearTimeout(connectionTimeout);
-            connectionTimeout = null;
-        }
-        if (peerConnection) {
-            // Отключаем обработчики, чтобы избежать утечек
-            peerConnection.oniceconnectionstatechange = null;
-            peerConnection.onicegatheringstatechange = null;
-            peerConnection.onsignalingstatechange = null;
-            peerConnection.ontrack = null;
-            peerConnection.onicecandidate = null;
-            peerConnection.close();
-            peerConnection = null;
-        }
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-            localStream = null;
+        if (currentCall) {
+            currentCall.leave();
+            currentCall = null;
         }
         hideCallModal();
-        hideIncomingCallModal(); // на всякий случай
-        
-        // Отправляем call_end только если до этого был активен звонок
-        if (isInCall) {
-            sendSignalingMessage({ type: 'call_end' });
+        // Остановка локального стрима (если он есть)
+        const localVideo = document.getElementById('localVideo');
+        if (localVideo.srcObject) {
+            localVideo.srcObject.getTracks().forEach(track => track.stop());
+            localVideo.srcObject = null;
         }
-        
-        isInCall = false;
-        currentCallChatId = null;
     }
 
     function showCallModal() {
@@ -2114,17 +1916,18 @@
     
     async function acceptIncomingCall() {
         hideIncomingCallModal();
-        if (pendingOffer) {
-            await acceptCall(pendingOffer);
-            pendingOffer = null;
+        if (window.pendingCallSession) {
+            await joinCall(window.pendingCallSession, window.pendingCallJoinUrl);
+            window.pendingCallSession = null;
+            window.pendingCallJoinUrl = null;
         }
     }
     
     function declineCall() {
         hideIncomingCallModal();
-        pendingOffer = null;
-        // Можно отправить уведомление об отклонении, если нужно
-        sendSignalingMessage({ type: 'call_end' });
+        sendSignalingMessage({ type: 'call_end' }); // опционально
+        window.pendingCallSession = null;
+        window.pendingCallJoinUrl = null;
     }
     
     function clearVideoPreview() {
@@ -3694,24 +3497,22 @@
                 toast('Пользователь вышел', '', 'info');
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
-            } else if (data.type === 'call_offer') {
-                console.log('📞 Incoming call_offer, isInCall:', isInCall, 'peerConnection exists:', !!peerConnection);
-                if (isInCall) {
-                    toast('Занято', 'Вы уже разговариваете', 'info');
+            } else if (data.type === 'realtime_call') {
+                if (currentCall) {
+                    // Уже в звонке, отправляем сигнал занято или просто игнорируем
                     return;
                 }
-                if (peerConnection) {
-                    console.warn('Peer connection already exists, ignoring offer');
+                pendingOffer = null; // устаревшее, можно убрать
+                // Получаем joinUrl с сервера
+                const res = await api('/api/calls/join/' + data.sessionId);
+                if (res.error) {
+                    toast('Ошибка', res.error, 'error');
                     return;
                 }
-                pendingOffer = data.offer;
-                // Принудительно показываем модалку
-                console.log('Showing incoming call modal');
                 showIncomingCallModal();
-            } else if (data.type === 'call_answer') {
-                if (peerConnection) {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                }
+                // Сохраняем sessionId для последующего принятия
+                window.pendingCallSession = data.sessionId;
+                window.pendingCallJoinUrl = res.joinUrl;
             } else if (data.type === 'ice_candidate') {
                 console.log('📦 Received remote ICE candidate:', data.candidate);
                 if (peerConnection && data.candidate) {
