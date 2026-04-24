@@ -1712,30 +1712,30 @@
     let connectionTimeout = null;
     const rtcConfig = {
         iceServers: [
-            // STUN от Google (работает всегда)
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
+            // STUN Google (работает по IP, если DNS заблокирован)
+            { urls: 'stun:173.194.76.127:19302' },
+            { urls: 'stun:74.125.250.129:19302' },
             
-            // Metered TURN (ваш предыдущий, но без relay-принуждения)
+            // Metered TURN – используем IP-адрес relay-ноды, которая была доступна
             {
-                urls: 'turn:global.relay.metered.ca:80',
+                urls: 'turn:172.232.156.54:3478?transport=udp',
                 username: '63e49bcccd5b425f9def1ff7',
-                credential: 'wYEK0cNfALIePvGx',
+                credential: 'wYEK0cNfALIePvGx'
             },
             {
-                urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+                urls: 'turn:172.232.156.54:3478?transport=tcp',
                 username: '63e49bcccd5b425f9def1ff7',
-                credential: 'wYEK0cNfALIePvGx',
+                credential: 'wYEK0cNfALIePvGx'
             },
             
-            // Резервный TURN от expressTurn (с IP-адресом для обхода DNS)
+            // Резервный TURN OpenRelay (простой пароль, только для теста)
             {
-                urls: 'turn:159.69.219.141:3478?transport=udp',
-                username: '000000002092120231',
-                credential: 'jPQk+CxIww0eVi3YiN20OuEjnw8='
+                urls: 'turn:64.233.161.152:3478?transport=udp',
+                username: 'yuri',
+                credential: 'yuri'
             }
         ],
-        iceTransportPolicy: 'all' // Разрешаем и прямое, и relay-соединения
+        iceTransportPolicy: 'all' // Пусть пробует все варианты
     };
 
     document.addEventListener('click', async (e) => {
