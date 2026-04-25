@@ -1813,25 +1813,52 @@
     
     async function joinCall(authToken) {
         try {
-            // Инициализируем встречу
-            const meeting = await RealtimeKitClient.init({ authToken: authToken });
+            const meeting = await RealtimeKitClient.init({ authToken });
             console.log('Meeting initialized:', meeting);
             currentMeeting = meeting;
     
-            // Создаём стандартный UI-провайдер
-            const provider = document.createElement('rtk-ui-provider');
-            provider.meeting = meeting;
-            provider.showSetupScreen = true;
-            document.body.appendChild(provider);
+            // Фактически подключаемся к SFU
+            await meeting.join();
     
-            // Показываем ваше модальное окно (можно адаптировать)
+            // Получаем локальный поток
+            let localStream;
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            } catch (e) {
+                if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
+                    toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                } else {
+                    throw e;
+                }
+            }
+    
+            // Публикуем свою камеру/микрофон
+            await meeting.self.publish(localStream);
+    
+            // Отображаем своё видео (локальное)
             showCallModal();
+            document.getElementById('localVideo').srcObject = localStream;
     
-            // Сохраняем для завершения звонка
+            // Отслеживаем удалённых участников (при подключении берём их поток)
+            meeting.participants.onParticipantJoined = (participant) => {
+                console.log('Участник подключился:', participant);
+                participant.onTrackPublished = (track) => {
+                    if (track.kind === 'video') {
+                        const remoteVideo = document.getElementById('remoteVideo');
+                        const stream = new MediaStream([track]);
+                        remoteVideo.srcObject = stream;
+                    } else if (track.kind === 'audio') {
+                        // аудио автоматически воспроизводится, если нужно отдельно — можно создать audio элемент
+                        const audio = new Audio();
+                        audio.srcObject = new MediaStream([track]);
+                        audio.play().catch(console.warn);
+                    }
+                };
+            };
+    
+            // Сохраняем для завершения
             window.currentMeeting = meeting;
-            window.currentProvider = provider;
-    
-            // Слушаем завершение через свойство participants (если понадобится)
         } catch (err) {
             console.error('Ошибка подключения к звонку:', err);
             toast('Ошибка', 'Не удалось подключиться к звонку', 'error');
@@ -1864,15 +1891,10 @@
 
     async function endCall() {
         if (currentMeeting) {
-            currentMeeting.leave();
+            currentMeeting.leave();  // отсоединяемся
             currentMeeting = null;
         }
-        if (window.currentProvider) {
-            window.currentProvider.remove();
-            window.currentProvider = null;
-        }
         hideCallModal();
-        // Останавливаем локальный стрим, если он был захвачен отдельно
         const localVideo = document.getElementById('localVideo');
         if (localVideo.srcObject) {
             localVideo.srcObject.getTracks().forEach(track => track.stop());
