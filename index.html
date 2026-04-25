@@ -217,6 +217,17 @@
         .modal-head h2{font-size:18px}
         .modal-body{flex:1;overflow-y:auto;padding:16px}
         .modal-footer{padding:16px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end}
+        rtk-ui-provider {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 9999;
+            background: #000;
+        }
         
         /* Avatar Upload */
         .avatar-upload{display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px}
@@ -1796,6 +1807,7 @@
     
             // Вставляем стандартный UI Cloudflare
             const provider = document.createElement('rtk-ui-provider');
+            console.log('Provider in DOM:', document.querySelector('rtk-ui-provider'));
             provider.meeting = meeting;
             provider.showSetupScreen = true;
             document.body.appendChild(provider);
@@ -3472,7 +3484,7 @@
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
             } else if (data.type === 'realtime_call') {
-                if (currentMeeting) return; // уже в звонке
+                if (currentMeeting) return;
                 const meetingId = data.meetingId;
                 try {
                     const res = await api('/api/calls/join/' + meetingId);
@@ -3480,8 +3492,8 @@
                         toast('Ошибка', res.error, 'error');
                         return;
                     }
-                    window.pendingAuthToken = res.authToken || res.token;
-                    showIncomingCallModal();   // показываем окно с кнопками
+                    // Сразу подключаемся
+                    await joinCall(res.authToken || res.token);
                 } catch (err) {
                     console.error('Ошибка получения данных звонка:', err);
                 }
