@@ -645,7 +645,7 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@cloudflare/realtimekit@latest/dist/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@cloudflare/realtimekit@latest/dist/browser.js"></script>
 </head>
 <body>
     <div class="toast-box" id="toasts"></div>
@@ -1706,6 +1706,7 @@
     let replyToContent = '';       // текст для отображения в плашке
     let messagesById = {}; // словарь всех загруженных сообщений по id
     let currentCall = null; // объект комнаты RealtimeKit
+    let currentMeeting = null;
     const rtcConfig = {
         iceServers: [
             // STUN от Google – пробуем через стандартный порт
@@ -1779,7 +1780,7 @@
             toast('Звонки', 'Пока только в личных чатах', 'info');
             return;
         }
-        if (currentCall) {
+        if (currentMeeting) {
             toast('Звонок уже активен', '', 'warning');
             return;
         }
@@ -1794,55 +1795,51 @@
                 return;
             }
     
-            // Отправляем meetingId собеседнику
             sendSignalingMessage({ type: 'realtime_call', meetingId: res.meetingId });
-    
-            // Подключаемся сами с полученным authToken
-            await joinCall(res.meetingId, res.authToken);
+            await joinCall(res.authToken);
         } catch (err) {
             console.error('Ошибка начала звонка:', err);
             toast('Ошибка', 'Не удалось начать звонок', 'error');
         }
     }
     
-    async function joinCall(meetingId, authToken) {
+    async function joinCall(authToken) {
         try {
+            // 1. Инициализация встречи
+            currentMeeting = await RealtimeKitClient.init({ authToken });
+    
+            // 2. Обработчики событий
+            currentMeeting.addEventListener('participantConnected', (event) => {
+                console.log('Участник подключился:', event.detail);
+            });
+            currentMeeting.addEventListener('participantDisconnected', () => endCall());
+            currentMeeting.addEventListener('error', (event) => {
+                console.error('Ошибка встречи:', event.detail);
+                toast('Ошибка звонка', event.detail.message || 'Неизвестная ошибка', 'error');
+                endCall();
+            });
+    
+            // 3. Получаем локальный поток
             let localStream;
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             } catch (e) {
-                // Если не вышло, пробуем только аудио
                 if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
                     toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
                     localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
                 } else {
-                    throw e; // Другая ошибка — пробрасываем дальше
+                    throw e;
                 }
             }
+    
+            // 4. Показываем UI и публикуем поток
             showCallModal();
             document.getElementById('localVideo').srcObject = localStream;
+            await currentMeeting.publish(localStream);
     
-            currentCall = new CloudflareRealtimeKit.Room(meetingId, {
-                authToken: authToken,
-                stream: localStream
-            });
-    
-            currentCall.on('participantConnected', (participant) => {
-                console.log('Участник подключился:', participant);
-                document.getElementById('remoteVideo').srcObject = participant.stream;
-            });
-    
-            currentCall.on('participantDisconnected', () => endCall());
-            currentCall.on('error', (err) => {
-                console.error('Ошибка комнаты:', err);
-                toast('Ошибка звонка', err.message, 'error');
-                endCall();
-            });
-    
-            await currentCall.join();
         } catch (err) {
             console.error('Ошибка подключения к звонку:', err);
-            toast('Ошибка', 'Не удалось получить доступ к камере/микрофону', 'error');
+            toast('Ошибка', 'Не удалось подключиться к звонку', 'error');
         }
     }
         
@@ -1871,12 +1868,11 @@
     }
 
     async function endCall() {
-        if (currentCall) {
-            currentCall.leave();
-            currentCall = null;
+        if (currentMeeting) {
+            currentMeeting.leave();
+            currentMeeting = null;
         }
         hideCallModal();
-        // Остановка локального стрима (если он есть)
         const localVideo = document.getElementById('localVideo');
         if (localVideo.srcObject) {
             localVideo.srcObject.getTracks().forEach(track => track.stop());
@@ -1922,9 +1918,9 @@
     
     async function acceptIncomingCall() {
         hideIncomingCallModal();
-        if (window.pendingCall) {
-            await joinCall(window.pendingCall.meetingId, window.pendingCall.authToken);
-            window.pendingCall = null;
+        if (window.pendingAuthToken) {
+            await joinCall(window.pendingAuthToken);
+            window.pendingAuthToken = null;
         }
     }
     
