@@ -1810,11 +1810,11 @@
             currentMeeting = await RealtimeKitClient.init({ authToken });
     
             // 2. Обработчики событий
-            currentMeeting.addEventListener('participantConnected', (event) => {
+            currentMeeting.on('participantConnected', (event) => {
                 console.log('Участник подключился:', event.detail);
             });
-            currentMeeting.addEventListener('participantDisconnected', () => endCall());
-            currentMeeting.addEventListener('error', (event) => {
+            currentMeeting.on('participantDisconnected', () => endCall());
+            currentMeeting.on('error', (event) => {
                 console.error('Ошибка встречи:', event.detail);
                 toast('Ошибка звонка', event.detail.message || 'Неизвестная ошибка', 'error');
                 endCall();
