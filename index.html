@@ -1711,25 +1711,7 @@
     let messagesById = {}; // словарь всех загруженных сообщений по id
     let currentCall = null; // объект комнаты RealtimeKit
     let currentMeeting = null;
-    const rtcConfig = {
-        iceServers: [
-            // STUN от Google – пробуем через стандартный порт
-            { urls: 'stun:stun.l.google.com:19302' },
-            // Metered TURN TCP (этот транспорт должен проходить почти везде)
-            {
-                urls: 'turn:global.relay.metered.ca:80?transport=tcp',
-                username: '63e49bcccd5b425f9def1ff7',
-                credential: 'wYEK0cNfALIePvGx'
-            },
-            // Публичный TURN от Twilio (тоже TCP, высокая доступность)
-            {
-                urls: 'turn:global.turn.twilio.com:3478?transport=tcp',
-                username: 'f4b6c5d4e3a2b1c0d9e8f7a6b5c4d3e2',
-                credential: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
-            }
-        ],
-        iceTransportPolicy: 'all' // разрешаем все типы, браузер сам выберет рабочий
-    };
+    let currentPeerConnection = null;
 
     document.addEventListener('click', async (e) => {
         const link = e.target.closest('.file-link');
@@ -1784,47 +1766,81 @@
             toast('Звонки', 'Пока только в личных чатах', 'info');
             return;
         }
-        if (currentMeeting) {
+        if (currentPeerConnection) {
             toast('Звонок уже активен', '', 'warning');
             return;
         }
-
-        toast("Подключение", "Идет подключение к серверу для совершения звонка");
-        
+    
         try {
             const res = await api('/api/calls/new', {
                 method: 'POST',
                 body: { recipientId: currentChat.id }
             });
-            console.log('Ответ от /api/calls/new:', res);
-            if (res.error) {
-                toast('Ошибка', res.error, 'error');
-                return;
-            }
+            if (res.error) { toast('Ошибка', res.error, 'error'); return; }
     
+            // Отправляем meetingId собеседнику
             sendSignalingMessage({ type: 'realtime_call', meetingId: res.meetingId });
-            // Передаём только authToken (токен участника) — SDK сам подключится
-            await joinCall(res.authToken || res.token);
+            await joinCall(res.joinUrl);
         } catch (err) {
-            console.error('Ошибка начала звонка:', err);
+            console.error(err);
             toast('Ошибка', 'Не удалось начать звонок', 'error');
         }
     }
     
-    async function joinCall(authToken) {
+    async function joinCall(joinUrl) {
         try {
-            const meeting = await RealtimeKitClient.init({ authToken });
-            currentMeeting = meeting;
+            let localStream;
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            } catch (e) {
+                if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
+                    toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                } else { throw e; }
+            }
     
-            // Готовый интерфейс Cloudflare
-            const provider = document.createElement('rtk-ui-provider');
-            provider.meeting = meeting;
-            provider.showSetupScreen = true;
-            document.body.appendChild(provider);
+            showCallModal();
+            document.getElementById('localVideo').srcObject = localStream;
     
-            showCallModal(); // ваше модальное окно можно оставить для фона
-            window.currentMeeting = meeting;
-            window.currentProvider = provider;
+            const pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+    
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    
+            pc.ontrack = (event) => {
+                const remoteVideo = document.getElementById('remoteVideo');
+                if (!remoteVideo.srcObject) remoteVideo.srcObject = event.streams[0];
+                else remoteVideo.srcObject.addTrack(event.track);
+            };
+    
+            pc.onicecandidate = (event) => {
+                if (event.candidate) sendSignalingMessage({ type: 'ice_candidate', candidate: event.candidate });
+            };
+    
+            const ws = new WebSocket(joinUrl);
+            const messageQueue = [];
+    
+            ws.onopen = () => {
+                while (messageQueue.length) ws.send(JSON.stringify(messageQueue.shift()));
+            };
+    
+            ws.onmessage = async (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'answer') {
+                    await pc.setRemoteDescription(new RTCSessionDescription(data));
+                } else if (data.type === 'ice_candidate') {
+                    await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+            };
+    
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            const offerMsg = { type: 'offer', sdp: offer.sdp };
+            if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(offerMsg));
+            else messageQueue.push(offerMsg);
+    
+            window.currentCall = { ws, pc, localStream };
         } catch (err) {
             console.error(err);
             toast('Ошибка', 'Не удалось подключиться к звонку', 'error');
@@ -1856,16 +1872,16 @@
     }
 
     async function endCall() {
-        if (currentMeeting) {
-            currentMeeting.leave();  // отсоединяемся
-            currentMeeting = null;
+        if (window.currentCall) {
+            window.currentCall.pc.close();
+            window.currentCall.ws.close();
+            window.currentCall.localStream.getTracks().forEach(t => t.stop());
+            window.currentCall = null;
         }
         hideCallModal();
-        const localVideo = document.getElementById('localVideo');
-        if (localVideo.srcObject) {
-            localVideo.srcObject.getTracks().forEach(track => track.stop());
-            localVideo.srcObject = null;
-        }
+        const lv = document.getElementById('localVideo');
+        if (lv.srcObject) { lv.srcObject.getTracks().forEach(t => t.stop()); lv.srcObject = null; }
+        sendSignalingMessage({ type: 'call_end' });
     }
 
     function showCallModal() {
@@ -3487,29 +3503,18 @@
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
             } else if (data.type === 'realtime_call') {
-                if (currentCall) return; // уже в звонке
+                if (window.currentCall) return;
                 const meetingId = data.meetingId;
                 try {
                     const res = await api('/api/calls/join/' + meetingId);
-                    if (res.error) {
-                        toast('Ошибка', res.error, 'error');
-                        return;
-                    }
-                    // Сразу подключаемся к звонку, передавая authToken
-                    await joinCall(res.authToken || res.token);
-                } catch (err) {
-                    console.error('Ошибка получения данных звонка:', err);
-                }
-            } else if (data.type === 'ice_candidate') {
-                console.log('📦 Received remote ICE candidate:', data.candidate);
-                if (peerConnection && data.candidate) {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
+                    if (res.error) { toast('Ошибка', res.error, 'error'); return; }
+                    await joinCall(res.joinUrl);
+                } catch (err) { console.error(err); }
+            } else if (data.type === 'ice_candidate' && window.currentCall) {
+                await window.currentCall.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
             } else if (data.type === 'call_end') {
                 console.log('📴 Received call_end');
-                if (isInCall) {
-                    endCall();
-                }
+                if (window.currentCall) endCall();
             }
         };
     
