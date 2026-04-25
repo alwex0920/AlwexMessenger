@@ -1807,7 +1807,18 @@
     
     async function joinCall(meetingId, authToken) {
         try {
-            const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            let localStream;
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            } catch (e) {
+                // Если не вышло, пробуем только аудио
+                if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
+                    toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                } else {
+                    throw e; // Другая ошибка — пробрасываем дальше
+                }
+            }
             showCallModal();
             document.getElementById('localVideo').srcObject = localStream;
     
