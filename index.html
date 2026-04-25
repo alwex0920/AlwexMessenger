@@ -1813,64 +1813,25 @@
     
     async function joinCall(authToken) {
         try {
-            // Инициализируем встречу через SDK
+            // Инициализируем встречу
             const meeting = await RealtimeKitClient.init({ authToken: authToken });
             console.log('Meeting initialized:', meeting);
-            const props = Object.getOwnPropertyNames(Object.getPrototypeOf(meeting));
-            console.log('Meeting prototype methods:', props);
             currentMeeting = meeting;
     
-            // Получаем локальный поток
-            let localStream;
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            } catch (e) {
-                if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
-                    toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
-                    localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-                } else {
-                    throw e;
-                }
-            }
+            // Создаём стандартный UI-провайдер
+            const provider = document.createElement('rtk-ui-provider');
+            provider.meeting = meeting;
+            provider.showSetupScreen = true;
+            document.body.appendChild(provider);
     
+            // Показываем ваше модальное окно (можно адаптировать)
             showCallModal();
-            document.getElementById('localVideo').srcObject = localStream;
     
-            // Публикуем локальный поток (если SDK это поддерживает)
-            if (meeting.publish) {
-                await meeting.publish(localStream);
-            }
+            // Сохраняем для завершения звонка
+            window.currentMeeting = meeting;
+            window.currentProvider = provider;
     
-            // Обработчики событий (используем on, если доступен)
-            if (typeof meeting.on === 'function') {
-                meeting.on('participantConnected', (participant) => {
-                    console.log('Участник подключился:', participant);
-                    if (participant.stream) {
-                        document.getElementById('remoteVideo').srcObject = participant.stream;
-                    }
-                });
-                meeting.on('participantDisconnected', () => endCall());
-                meeting.on('error', (err) => {
-                    console.error('Ошибка встречи:', err);
-                    toast('Ошибка звонка', err.message || 'Неизвестная ошибка', 'error');
-                    endCall();
-                });
-            } else if (typeof meeting.addEventListener === 'function') {
-                meeting.addEventListener('participantConnected', (event) => {
-                    const participant = event.detail;
-                    console.log('Участник подключился:', participant);
-                    if (participant.stream) {
-                        document.getElementById('remoteVideo').srcObject = participant.stream;
-                    }
-                });
-                meeting.addEventListener('participantDisconnected', () => endCall());
-                meeting.addEventListener('error', (event) => {
-                    console.error('Ошибка встречи:', event.detail);
-                    toast('Ошибка звонка', event.detail.message || 'Неизвестная ошибка', 'error');
-                    endCall();
-                });
-            }
-    
+            // Слушаем завершение через свойство participants (если понадобится)
         } catch (err) {
             console.error('Ошибка подключения к звонку:', err);
             toast('Ошибка', 'Не удалось подключиться к звонку', 'error');
@@ -1906,7 +1867,12 @@
             currentMeeting.leave();
             currentMeeting = null;
         }
+        if (window.currentProvider) {
+            window.currentProvider.remove();
+            window.currentProvider = null;
+        }
         hideCallModal();
+        // Останавливаем локальный стрим, если он был захвачен отдельно
         const localVideo = document.getElementById('localVideo');
         if (localVideo.srcObject) {
             localVideo.srcObject.getTracks().forEach(track => track.stop());
