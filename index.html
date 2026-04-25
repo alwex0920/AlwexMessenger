@@ -1799,33 +1799,16 @@
             }
     
             sendSignalingMessage({ type: 'realtime_call', meetingId: res.meetingId });
-            await joinCall(res.authToken);
+            await joinCall(res.authToken, res.joinUrl);
         } catch (err) {
             console.error('Ошибка начала звонка:', err);
             toast('Ошибка', 'Не удалось начать звонок', 'error');
         }
     }
     
-    async function joinCall(authToken) {
+    async function joinCall(authToken, joinUrl) {
         try {
-            // 1. Инициализация встречи
-            currentMeeting = await RealtimeKitClient.init({ authToken });
-            console.log('currentMeeting:', currentMeeting);
-            console.log('currentMeeting keys:', Object.keys(currentMeeting));
-            console.log('currentMeeting constructor:', currentMeeting.constructor.name);
-    
-            // 2. Обработчики событий
-            currentMeeting.on('participantConnected', (event) => {
-                console.log('Участник подключился:', event.detail);
-            });
-            currentMeeting.on('participantDisconnected', () => endCall());
-            currentMeeting.on('error', (event) => {
-                console.error('Ошибка встречи:', event.detail);
-                toast('Ошибка звонка', event.detail.message || 'Неизвестная ошибка', 'error');
-                endCall();
-            });
-    
-            // 3. Получаем локальный поток
+            // Получаем локальный поток
             let localStream;
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -1838,10 +1821,52 @@
                 }
             }
     
-            // 4. Показываем UI и публикуем поток
             showCallModal();
             document.getElementById('localVideo').srcObject = localStream;
-            await currentMeeting.publish(localStream);
+    
+            // Подключаемся к SFU
+            const ws = new WebSocket(joinUrl);
+            const pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+    
+            // Добавляем локальные треки в peer connection
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    
+            // Получаем удалённый поток
+            pc.ontrack = (event) => {
+                const remoteVideo = document.getElementById('remoteVideo');
+                if (!remoteVideo.srcObject) {
+                    remoteVideo.srcObject = event.streams[0];
+                } else {
+                    remoteVideo.srcObject.addTrack(event.track);
+                }
+            };
+    
+            // ICE-кандидаты отправляем через WebSocket
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    ws.send(JSON.stringify({ type: 'ice_candidate', candidate: event.candidate }));
+                }
+            };
+    
+            // Обработка сообщений от SFU
+            ws.onmessage = async (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'answer') {
+                    await pc.setRemoteDescription(new RTCSessionDescription(data));
+                } else if (data.type === 'ice_candidate') {
+                    await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+            };
+    
+            // Создаём offer и отправляем через WebSocket
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            ws.send(JSON.stringify({ type: 'offer', sdp: offer.sdp }));
+    
+            // Сохраняем для завершения
+            window.currentCall = { ws, pc, localStream };
     
         } catch (err) {
             console.error('Ошибка подключения к звонку:', err);
@@ -1924,9 +1949,10 @@
     
     async function acceptIncomingCall() {
         hideIncomingCallModal();
-        if (window.pendingAuthToken) {
-            await joinCall(window.pendingAuthToken);
+        if (window.pendingAuthToken && window.pendingJoinUrl) {
+            await joinCall(window.pendingAuthToken, window.pendingJoinUrl);
             window.pendingAuthToken = null;
+            window.pendingJoinUrl = null;
         }
     }
     
@@ -3513,7 +3539,9 @@
                         toast('Ошибка', res.error, 'error');
                         return;
                     }
-                    window.pendingCall = { meetingId, authToken: res.authToken };
+                    // Сохраняем оба значения
+                    window.pendingAuthToken = res.authToken;
+                    window.pendingJoinUrl = res.joinUrl;
                     showIncomingCallModal();
                 } catch (err) {
                     console.error('Ошибка получения данных звонка:', err);
