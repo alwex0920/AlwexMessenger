@@ -1861,11 +1861,15 @@
             currentMeeting.leave();
             currentMeeting = null;
         }
-        if (window.currentMeetingElement) {
-            window.currentMeetingElement.remove();
-            window.currentMeetingElement = null;
+        // Удаляем элемент UI
+        const meetingElement = document.getElementById('current-meeting');
+        if (meetingElement) {
+            meetingElement.remove();
         }
-        hideCallModal();
+        // Очищаем ссылки
+        window.currentMeeting = null;
+        window.currentMeetingElement = null;
+        // Не вызываем hideCallModal() — наше старое модальное окно не используется
         sendSignalingMessage({ type: 'call_end' });
     }
 
@@ -3489,16 +3493,17 @@
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
             } else if (data.type === 'realtime_call') {
-                if (currentMeeting) return;
+                if (currentMeeting) return; // уже в звонке
                 const meetingId = data.meetingId;
                 try {
                     const res = await api('/api/calls/join/' + meetingId);
+                    console.log('Ответ /api/calls/join:', res); // для диагностики
                     if (res.error) {
                         toast('Ошибка', res.error, 'error');
                         return;
                     }
-                    // Сразу подключаемся
-                    await joinCall(res.authToken || res.token);
+                    window.pendingAuthToken = res.authToken || res.token;
+                    showIncomingCallModal();   // показываем модалку
                 } catch (err) {
                     console.error('Ошибка получения данных звонка:', err);
                 }
