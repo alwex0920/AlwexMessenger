@@ -1792,6 +1792,8 @@
             toast('Звонок уже активен', '', 'warning');
             return;
         }
+
+        toast("Подключение", "Идет подключение к серверу для совершение звонка");
     
         try {
             const res = await api('/api/calls/new', {
