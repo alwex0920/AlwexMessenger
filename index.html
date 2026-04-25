@@ -1808,7 +1808,6 @@
     
     async function joinCall(authToken, joinUrl) {
         try {
-            // Получаем локальный поток
             let localStream;
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -1824,13 +1823,35 @@
             showCallModal();
             document.getElementById('localVideo').srcObject = localStream;
     
-            // Подключаемся к SFU
             const ws = new WebSocket(joinUrl);
             const pc = new RTCPeerConnection({
                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
             });
     
-            // Добавляем локальные треки в peer connection
+            // Очередь сообщений, которые нужно отправить после открытия WS
+            const messageQueue = [];
+    
+            // Обработчик открытия WebSocket
+            ws.onopen = () => {
+                // Отправляем все накопленные сообщения
+                while (messageQueue.length > 0) {
+                    ws.send(JSON.stringify(messageQueue.shift()));
+                }
+            };
+    
+            // Обработчик ICE-кандидатов
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    const msg = { type: 'ice_candidate', candidate: event.candidate };
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify(msg));
+                    } else {
+                        messageQueue.push(msg);
+                    }
+                }
+            };
+    
+            // Добавляем локальные треки
             localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
     
             // Получаем удалённый поток
@@ -1840,13 +1861,6 @@
                     remoteVideo.srcObject = event.streams[0];
                 } else {
                     remoteVideo.srcObject.addTrack(event.track);
-                }
-            };
-    
-            // ICE-кандидаты отправляем через WebSocket
-            pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    ws.send(JSON.stringify({ type: 'ice_candidate', candidate: event.candidate }));
                 }
             };
     
@@ -1860,10 +1874,17 @@
                 }
             };
     
-            // Создаём offer и отправляем через WebSocket
+            // Создаём offer
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
-            ws.send(JSON.stringify({ type: 'offer', sdp: offer.sdp }));
+    
+            // Отправляем offer сразу или ставим в очередь
+            const offerMsg = { type: 'offer', sdp: offer.sdp };
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(offerMsg));
+            } else {
+                messageQueue.push(offerMsg);
+            }
     
             // Сохраняем для завершения
             window.currentCall = { ws, pc, localStream };
