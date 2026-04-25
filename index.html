@@ -1794,26 +1794,25 @@
                 return;
             }
     
-            // Сохраняем sessionId и отправляем собеседнику через WebSocket
-            const sessionId = res.sessionId;
-            sendSignalingMessage({ type: 'realtime_call', sessionId });
+            // Отправляем meetingId собеседнику
+            sendSignalingMessage({ type: 'realtime_call', meetingId: res.meetingId });
     
-            // Подключаемся к комнате
-            await joinCall(sessionId, res.joinUrl);
+            // Подключаемся сами с полученным authToken
+            await joinCall(res.meetingId, res.authToken);
         } catch (err) {
             console.error('Ошибка начала звонка:', err);
             toast('Ошибка', 'Не удалось начать звонок', 'error');
         }
     }
     
-    async function joinCall(sessionId, joinUrl) {
+    async function joinCall(meetingId, authToken) {
         try {
             const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             showCallModal();
             document.getElementById('localVideo').srcObject = localStream;
     
-            currentCall = new CloudflareRealtimeKit.Room(sessionId, {
-                token: joinUrl,
+            currentCall = new CloudflareRealtimeKit.Room(meetingId, {
+                authToken: authToken,
                 stream: localStream
             });
     
@@ -1822,14 +1821,10 @@
                 document.getElementById('remoteVideo').srcObject = participant.stream;
             });
     
-            currentCall.on('participantDisconnected', (participant) => {
-                console.log('Участник отключился:', participant);
-                endCall();
-            });
-    
-            currentCall.on('error', (error) => {
-                console.error('Ошибка комнаты:', error);
-                toast('Ошибка звонка', error.message, 'error');
+            currentCall.on('participantDisconnected', () => endCall());
+            currentCall.on('error', (err) => {
+                console.error('Ошибка комнаты:', err);
+                toast('Ошибка звонка', err.message, 'error');
                 endCall();
             });
     
@@ -1916,10 +1911,9 @@
     
     async function acceptIncomingCall() {
         hideIncomingCallModal();
-        if (window.pendingCallSession) {
-            await joinCall(window.pendingCallSession, window.pendingCallJoinUrl);
-            window.pendingCallSession = null;
-            window.pendingCallJoinUrl = null;
+        if (window.pendingCall) {
+            await joinCall(window.pendingCall.meetingId, window.pendingCall.authToken);
+            window.pendingCall = null;
         }
     }
     
@@ -3498,21 +3492,19 @@
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
             } else if (data.type === 'realtime_call') {
-                if (currentCall) {
-                    // Уже в звонке, отправляем сигнал занято или просто игнорируем
-                    return;
+                if (currentCall) return; // уже в звонке
+                const meetingId = data.meetingId;
+                try {
+                    const res = await api('/api/calls/join/' + meetingId);
+                    if (res.error) {
+                        toast('Ошибка', res.error, 'error');
+                        return;
+                    }
+                    window.pendingCall = { meetingId, authToken: res.authToken };
+                    showIncomingCallModal();
+                } catch (err) {
+                    console.error('Ошибка получения данных звонка:', err);
                 }
-                pendingOffer = null; // устаревшее, можно убрать
-                // Получаем joinUrl с сервера
-                const res = await api('/api/calls/join/' + data.sessionId);
-                if (res.error) {
-                    toast('Ошибка', res.error, 'error');
-                    return;
-                }
-                showIncomingCallModal();
-                // Сохраняем sessionId для последующего принятия
-                window.pendingCallSession = data.sessionId;
-                window.pendingCallJoinUrl = res.joinUrl;
             } else if (data.type === 'ice_candidate') {
                 console.log('📦 Received remote ICE candidate:', data.candidate);
                 if (peerConnection && data.candidate) {
