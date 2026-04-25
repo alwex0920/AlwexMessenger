@@ -1784,7 +1784,9 @@
             toast('Звонок уже активен', '', 'warning');
             return;
         }
-    
+
+        toast("Подключение", "Идет подключение к серверу для совершения звонка.");
+        
         try {
             const res = await api('/api/calls/new', {
                 method: 'POST',
@@ -1808,6 +1810,9 @@
         try {
             // 1. Инициализация встречи
             currentMeeting = await RealtimeKitClient.init({ authToken });
+            console.log('currentMeeting:', currentMeeting);
+            console.log('currentMeeting keys:', Object.keys(currentMeeting));
+            console.log('currentMeeting constructor:', currentMeeting.constructor.name);
     
             // 2. Обработчики событий
             currentMeeting.on('participantConnected', (event) => {
