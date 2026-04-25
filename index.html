@@ -646,6 +646,10 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@cloudflare/realtimekit@latest/dist/browser.js"></script>
+    <script type="module">
+        import { defineCustomElements } from "https://cdn.jsdelivr.net/npm/@cloudflare/realtimekit-ui@latest/loader/index.es2017.js";
+        defineCustomElements();
+    </script>
 </head>
 <body>
     <div class="toast-box" id="toasts"></div>
@@ -1784,30 +1788,35 @@
             toast('Звонок уже активен', '', 'warning');
             return;
         }
-
-        toast("Подключение", "Идет подключение к серверу для совершения звонка.");
-        
+    
         try {
             const res = await api('/api/calls/new', {
                 method: 'POST',
                 body: { recipientId: currentChat.id }
             });
-            console.log('Ответ от /api/calls/new:', res);  // <-- ДОБАВЬ ЭТУ СТРОКУ
+            console.log('Ответ от /api/calls/new:', res);
             if (res.error) {
                 toast('Ошибка', res.error, 'error');
                 return;
             }
     
             sendSignalingMessage({ type: 'realtime_call', meetingId: res.meetingId });
-            await joinCall(res.authToken, res.joinUrl);
+            // Передаём только authToken (токен участника) — SDK сам подключится
+            await joinCall(res.authToken || res.token);
         } catch (err) {
             console.error('Ошибка начала звонка:', err);
             toast('Ошибка', 'Не удалось начать звонок', 'error');
         }
     }
     
-    async function joinCall(authToken, joinUrl) {
+    async function joinCall(authToken) {
         try {
+            // Инициализируем встречу через SDK
+            const meeting = await RealtimeKitClient.init({ authToken: authToken });
+            console.log('Meeting initialized:', meeting);
+            currentMeeting = meeting;
+    
+            // Получаем локальный поток
             let localStream;
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -1823,71 +1832,40 @@
             showCallModal();
             document.getElementById('localVideo').srcObject = localStream;
     
-            const ws = new WebSocket(joinUrl);
-            const pc = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-            });
-    
-            // Очередь сообщений, которые нужно отправить после открытия WS
-            const messageQueue = [];
-    
-            // Обработчик открытия WebSocket
-            ws.onopen = () => {
-                // Отправляем все накопленные сообщения
-                while (messageQueue.length > 0) {
-                    ws.send(JSON.stringify(messageQueue.shift()));
-                }
-            };
-    
-            // Обработчик ICE-кандидатов
-            pc.onicecandidate = (event) => {
-                if (event.candidate) {
-                    const msg = { type: 'ice_candidate', candidate: event.candidate };
-                    if (ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify(msg));
-                    } else {
-                        messageQueue.push(msg);
-                    }
-                }
-            };
-    
-            // Добавляем локальные треки
-            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-    
-            // Получаем удалённый поток
-            pc.ontrack = (event) => {
-                const remoteVideo = document.getElementById('remoteVideo');
-                if (!remoteVideo.srcObject) {
-                    remoteVideo.srcObject = event.streams[0];
-                } else {
-                    remoteVideo.srcObject.addTrack(event.track);
-                }
-            };
-    
-            // Обработка сообщений от SFU
-            ws.onmessage = async (event) => {
-                const data = JSON.parse(event.data);
-                if (data.type === 'answer') {
-                    await pc.setRemoteDescription(new RTCSessionDescription(data));
-                } else if (data.type === 'ice_candidate') {
-                    await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-            };
-    
-            // Создаём offer
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-    
-            // Отправляем offer сразу или ставим в очередь
-            const offerMsg = { type: 'offer', sdp: offer.sdp };
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify(offerMsg));
-            } else {
-                messageQueue.push(offerMsg);
+            // Публикуем локальный поток (если SDK это поддерживает)
+            if (meeting.publish) {
+                await meeting.publish(localStream);
             }
     
-            // Сохраняем для завершения
-            window.currentCall = { ws, pc, localStream };
+            // Обработчики событий (используем on, если доступен)
+            if (typeof meeting.on === 'function') {
+                meeting.on('participantConnected', (participant) => {
+                    console.log('Участник подключился:', participant);
+                    if (participant.stream) {
+                        document.getElementById('remoteVideo').srcObject = participant.stream;
+                    }
+                });
+                meeting.on('participantDisconnected', () => endCall());
+                meeting.on('error', (err) => {
+                    console.error('Ошибка встречи:', err);
+                    toast('Ошибка звонка', err.message || 'Неизвестная ошибка', 'error');
+                    endCall();
+                });
+            } else if (typeof meeting.addEventListener === 'function') {
+                meeting.addEventListener('participantConnected', (event) => {
+                    const participant = event.detail;
+                    console.log('Участник подключился:', participant);
+                    if (participant.stream) {
+                        document.getElementById('remoteVideo').srcObject = participant.stream;
+                    }
+                });
+                meeting.addEventListener('participantDisconnected', () => endCall());
+                meeting.addEventListener('error', (event) => {
+                    console.error('Ошибка встречи:', event.detail);
+                    toast('Ошибка звонка', event.detail.message || 'Неизвестная ошибка', 'error');
+                    endCall();
+                });
+            }
     
         } catch (err) {
             console.error('Ошибка подключения к звонку:', err);
@@ -1970,10 +1948,9 @@
     
     async function acceptIncomingCall() {
         hideIncomingCallModal();
-        if (window.pendingAuthToken && window.pendingJoinUrl) {
-            await joinCall(window.pendingAuthToken, window.pendingJoinUrl);
+        if (window.pendingAuthToken) {
+            await joinCall(window.pendingAuthToken);
             window.pendingAuthToken = null;
-            window.pendingJoinUrl = null;
         }
     }
     
