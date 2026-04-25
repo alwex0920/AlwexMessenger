@@ -1814,73 +1814,19 @@
     async function joinCall(authToken) {
         try {
             const meeting = await RealtimeKitClient.init({ authToken });
-            console.log('Meeting initialized:', meeting);
             currentMeeting = meeting;
     
-            // Фактически подключаемся к SFU
-            await meeting.join();
+            // Готовый интерфейс Cloudflare
+            const provider = document.createElement('rtk-ui-provider');
+            provider.meeting = meeting;
+            provider.showSetupScreen = true;
+            document.body.appendChild(provider);
     
-            // Получаем локальный поток
-            let localStream;
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            } catch (e) {
-                if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
-                    toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
-                    localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-                } else {
-                    throw e;
-                }
-            }
-    
-            // Публикуем свою камеру/микрофон
-            try {
-                if (typeof meeting.addTrack === 'function') {
-                    localStream.getTracks().forEach(track => meeting.addTrack(track));
-                    console.log('✅ Треки опубликованы через addTrack');
-                } else if (typeof meeting.publish === 'function') {
-                    await meeting.publish(localStream);
-                    console.log('✅ Поток опубликован через publish');
-                } else if (meeting.self && typeof meeting.self.addTrack === 'function') {
-                    localStream.getTracks().forEach(track => meeting.self.addTrack(track));
-                    console.log('✅ Треки опубликованы через meeting.self.addTrack');
-                } else {
-                    console.warn('⚠️ Метод публикации не найден. Пробуем передать stream при инициализации');
-                    // Запасной вариант: передать поток при создании встречи
-                    const meeting2 = await RealtimeKitClient.init({ authToken, stream: localStream });
-                    currentMeeting = meeting2;
-                    await meeting2.join();
-                }
-            } catch (e) {
-                console.error('Ошибка публикации:', e);
-                toast('Ошибка', 'Не удалось отправить видео', 'error');
-            }
-    
-            // Отображаем своё видео (локальное)
-            showCallModal();
-            document.getElementById('localVideo').srcObject = localStream;
-    
-            // Отслеживаем удалённых участников (при подключении берём их поток)
-            meeting.participants.onParticipantJoined = (participant) => {
-                console.log('Участник подключился:', participant);
-                participant.onTrackPublished = (track) => {
-                    if (track.kind === 'video') {
-                        const remoteVideo = document.getElementById('remoteVideo');
-                        const stream = new MediaStream([track]);
-                        remoteVideo.srcObject = stream;
-                    } else if (track.kind === 'audio') {
-                        // аудио автоматически воспроизводится, если нужно отдельно — можно создать audio элемент
-                        const audio = new Audio();
-                        audio.srcObject = new MediaStream([track]);
-                        audio.play().catch(console.warn);
-                    }
-                };
-            };
-    
-            // Сохраняем для завершения
+            showCallModal(); // ваше модальное окно можно оставить для фона
             window.currentMeeting = meeting;
+            window.currentProvider = provider;
         } catch (err) {
-            console.error('Ошибка подключения к звонку:', err);
+            console.error(err);
             toast('Ошибка', 'Не удалось подключиться к звонку', 'error');
         }
     }
@@ -3549,10 +3495,8 @@
                         toast('Ошибка', res.error, 'error');
                         return;
                     }
-                    // Сохраняем оба значения
-                    window.pendingAuthToken = res.authToken;
-                    window.pendingJoinUrl = res.joinUrl;
-                    showIncomingCallModal();
+                    // Сразу подключаемся к звонку, передавая authToken
+                    await joinCall(res.authToken || res.token);
                 } catch (err) {
                     console.error('Ошибка получения данных звонка:', err);
                 }
