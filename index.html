@@ -1766,7 +1766,7 @@
             toast('Звонки', 'Пока только в личных чатах', 'info');
             return;
         }
-        if (currentPeerConnection) {
+        if (currentMeeting) {
             toast('Звонок уже активен', '', 'warning');
             return;
         }
@@ -1776,71 +1776,33 @@
                 method: 'POST',
                 body: { recipientId: currentChat.id }
             });
-            if (res.error) { toast('Ошибка', res.error, 'error'); return; }
+            if (res.error) {
+                toast('Ошибка', res.error, 'error');
+                return;
+            }
     
-            // Отправляем meetingId собеседнику
             sendSignalingMessage({ type: 'realtime_call', meetingId: res.meetingId });
-            await joinCall(res.joinUrl);
+            await joinCall(res.authToken || res.token);
         } catch (err) {
-            console.error(err);
+            console.error('Ошибка начала звонка:', err);
             toast('Ошибка', 'Не удалось начать звонок', 'error');
         }
     }
     
-    async function joinCall(joinUrl) {
+    async function joinCall(authToken) {
         try {
-            let localStream;
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            } catch (e) {
-                if (e.name === 'NotFoundError' || e.name === 'NotAllowedError') {
-                    toast('Камера недоступна', 'Звонок будет только с аудио', 'info');
-                    localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-                } else { throw e; }
-            }
+            const meeting = await RealtimeKitClient.init({ authToken });
+            currentMeeting = meeting;
     
-            showCallModal();
-            document.getElementById('localVideo').srcObject = localStream;
+            // Вставляем стандартный UI Cloudflare
+            const provider = document.createElement('rtk-ui-provider');
+            provider.meeting = meeting;
+            provider.showSetupScreen = true;
+            document.body.appendChild(provider);
     
-            const pc = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-            });
-    
-            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-    
-            pc.ontrack = (event) => {
-                const remoteVideo = document.getElementById('remoteVideo');
-                if (!remoteVideo.srcObject) remoteVideo.srcObject = event.streams[0];
-                else remoteVideo.srcObject.addTrack(event.track);
-            };
-    
-            pc.onicecandidate = (event) => {
-                if (event.candidate) sendSignalingMessage({ type: 'ice_candidate', candidate: event.candidate });
-            };
-    
-            const ws = new WebSocket(joinUrl);
-            const messageQueue = [];
-    
-            ws.onopen = () => {
-                while (messageQueue.length) ws.send(JSON.stringify(messageQueue.shift()));
-            };
-    
-            ws.onmessage = async (event) => {
-                const data = JSON.parse(event.data);
-                if (data.type === 'answer') {
-                    await pc.setRemoteDescription(new RTCSessionDescription(data));
-                } else if (data.type === 'ice_candidate') {
-                    await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-            };
-    
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            const offerMsg = { type: 'offer', sdp: offer.sdp };
-            if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(offerMsg));
-            else messageQueue.push(offerMsg);
-    
-            window.currentCall = { ws, pc, localStream };
+            // Не показываем наше модальное окно, UI всё сделает сам
+            window.currentMeeting = meeting;
+            window.currentProvider = provider;
         } catch (err) {
             console.error(err);
             toast('Ошибка', 'Не удалось подключиться к звонку', 'error');
@@ -1872,15 +1834,21 @@
     }
 
     async function endCall() {
-        if (window.currentCall) {
-            window.currentCall.pc.close();
-            window.currentCall.ws.close();
-            window.currentCall.localStream.getTracks().forEach(t => t.stop());
-            window.currentCall = null;
+        if (currentMeeting) {
+            currentMeeting.leave();
+            currentMeeting = null;
+        }
+        // Удаляем UI-провайдер Cloudflare, если он был создан
+        if (window.currentProvider) {
+            window.currentProvider.remove();
+            window.currentProvider = null;
         }
         hideCallModal();
         const lv = document.getElementById('localVideo');
-        if (lv.srcObject) { lv.srcObject.getTracks().forEach(t => t.stop()); lv.srcObject = null; }
+        if (lv && lv.srcObject) {
+            lv.srcObject.getTracks().forEach(t => t.stop());
+            lv.srcObject = null;
+        }
         sendSignalingMessage({ type: 'call_end' });
     }
 
@@ -1920,6 +1888,7 @@
         document.getElementById('incomingCallModal').classList.remove('show');
     }
     
+    // Кнопка «Принять» в модальном окне:
     async function acceptIncomingCall() {
         hideIncomingCallModal();
         if (window.pendingAuthToken) {
@@ -1928,11 +1897,11 @@
         }
     }
     
+    // «Отклонить»:
     function declineCall() {
         hideIncomingCallModal();
-        sendSignalingMessage({ type: 'call_end' }); // опционально
-        window.pendingCallSession = null;
-        window.pendingCallJoinUrl = null;
+        sendSignalingMessage({ type: 'call_end' });
+        window.pendingAuthToken = null;
     }
     
     function clearVideoPreview() {
@@ -3503,18 +3472,21 @@
             } else if (data.type === 'connected') {
                 console.log('WebSocket ready');
             } else if (data.type === 'realtime_call') {
-                if (window.currentCall) return;
+                if (currentMeeting) return; // уже в звонке
                 const meetingId = data.meetingId;
                 try {
                     const res = await api('/api/calls/join/' + meetingId);
-                    if (res.error) { toast('Ошибка', res.error, 'error'); return; }
-                    await joinCall(res.joinUrl);
-                } catch (err) { console.error(err); }
-            } else if (data.type === 'ice_candidate' && window.currentCall) {
-                await window.currentCall.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    if (res.error) {
+                        toast('Ошибка', res.error, 'error');
+                        return;
+                    }
+                    window.pendingAuthToken = res.authToken || res.token;
+                    showIncomingCallModal();   // показываем окно с кнопками
+                } catch (err) {
+                    console.error('Ошибка получения данных звонка:', err);
+                }
             } else if (data.type === 'call_end') {
-                console.log('📴 Received call_end');
-                if (window.currentCall) endCall();
+                endCall();
             }
         };
     
