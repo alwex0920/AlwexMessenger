@@ -1790,6 +1790,7 @@
                 method: 'POST',
                 body: { recipientId: currentChat.id }
             });
+            console.log('Ответ от /api/calls/new:', res);  // <-- ДОБАВЬ ЭТУ СТРОКУ
             if (res.error) {
                 toast('Ошибка', res.error, 'error');
                 return;
