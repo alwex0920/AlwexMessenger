@@ -228,6 +228,17 @@
             z-index: 99999 !important;
             background: #000 !important;
         }
+        rtk-meeting {
+            display: flex !important;
+            flex-direction: column !important;
+            height: 100vh !important;
+            width: 100vw !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 99999 !important;
+            background: #000 !important;
+        }
         
         /* Avatar Upload */
         .avatar-upload{display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px}
@@ -1806,12 +1817,11 @@
             currentMeeting = meeting;
     
             // Вставляем стандартный UI Cloudflare
-            const provider = document.createElement('rtk-ui-provider');
-            provider.setAttribute('show-setup-screen', '');
-            provider.meeting = meeting;
-            provider.showSetupScreen = true;
-            document.body.appendChild(provider);
-            console.log('Provider in DOM:', document.querySelector('rtk-ui-provider'));
+            const meetingElement = document.createElement('rtk-meeting');
+            meetingElement.id = 'current-meeting';
+            meetingElement.meeting = meeting;
+            document.body.appendChild(meetingElement);
+            console.log('Provider in DOM:', document.querySelector('rtk-meeting'));
     
             // Не показываем наше модальное окно, UI всё сделает сам
             window.currentMeeting = meeting;
@@ -1851,17 +1861,11 @@
             currentMeeting.leave();
             currentMeeting = null;
         }
-        // Удаляем UI-провайдер Cloudflare, если он был создан
-        if (window.currentProvider) {
-            window.currentProvider.remove();
-            window.currentProvider = null;
+        if (window.currentMeetingElement) {
+            window.currentMeetingElement.remove();
+            window.currentMeetingElement = null;
         }
         hideCallModal();
-        const lv = document.getElementById('localVideo');
-        if (lv && lv.srcObject) {
-            lv.srcObject.getTracks().forEach(t => t.stop());
-            lv.srcObject = null;
-        }
         sendSignalingMessage({ type: 'call_end' });
     }
 
