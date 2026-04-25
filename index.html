@@ -1834,7 +1834,27 @@
             }
     
             // Публикуем свою камеру/микрофон
-            await meeting.self.publish(localStream);
+            try {
+                if (typeof meeting.addTrack === 'function') {
+                    localStream.getTracks().forEach(track => meeting.addTrack(track));
+                    console.log('✅ Треки опубликованы через addTrack');
+                } else if (typeof meeting.publish === 'function') {
+                    await meeting.publish(localStream);
+                    console.log('✅ Поток опубликован через publish');
+                } else if (meeting.self && typeof meeting.self.addTrack === 'function') {
+                    localStream.getTracks().forEach(track => meeting.self.addTrack(track));
+                    console.log('✅ Треки опубликованы через meeting.self.addTrack');
+                } else {
+                    console.warn('⚠️ Метод публикации не найден. Пробуем передать stream при инициализации');
+                    // Запасной вариант: передать поток при создании встречи
+                    const meeting2 = await RealtimeKitClient.init({ authToken, stream: localStream });
+                    currentMeeting = meeting2;
+                    await meeting2.join();
+                }
+            } catch (e) {
+                console.error('Ошибка публикации:', e);
+                toast('Ошибка', 'Не удалось отправить видео', 'error');
+            }
     
             // Отображаем своё видео (локальное)
             showCallModal();
