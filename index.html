@@ -1821,13 +1821,14 @@
             meetingElement.id = 'current-meeting';
             meetingElement.meeting = meeting;
             document.body.appendChild(meetingElement);
-            console.log('Provider in DOM:', document.querySelector('rtk-meeting'));
+            console.log('Meeting element in DOM:', document.querySelector('rtk-meeting'));
     
-            // Не показываем наше модальное окно, UI всё сделает сам
+            // Сохраняем для последующего закрытия
             window.currentMeeting = meeting;
-            window.currentProvider = provider;
+            window.currentMeetingElement = meetingElement; // РАНЬШЕ БЫЛО provider – ОШИБКА
+    
         } catch (err) {
-            console.error(err);
+            console.error('joinCall error:', err);
             toast('Ошибка', 'Не удалось подключиться к звонку', 'error');
         }
     }
@@ -1861,15 +1862,16 @@
             currentMeeting.leave();
             currentMeeting = null;
         }
-        // Удаляем элемент UI
+        // Удаляем UI-элемент
         const meetingElement = document.getElementById('current-meeting');
         if (meetingElement) {
             meetingElement.remove();
         }
-        // Очищаем ссылки
         window.currentMeeting = null;
         window.currentMeetingElement = null;
-        // Не вызываем hideCallModal() — наше старое модальное окно не используется
+        // Скрываем оба модальных окна (на случай, если они открыты)
+        hideCallModal();
+        hideIncomingCallModal();
         sendSignalingMessage({ type: 'call_end' });
     }
 
