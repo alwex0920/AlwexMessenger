@@ -4049,6 +4049,7 @@
         document.getElementById('inputArea').style.display = 'flex';
         document.getElementById('sidebar').classList.add('hide');
         document.getElementById('msgInput').focus();
+        document.getElementById('callBtn').style.display = (currentChatType === 'direct') ? 'flex' : 'none';
         lastMsgId = 0;
     }
 
