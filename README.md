@@ -149,7 +149,7 @@ Supabase Storage (файлы)
 ## 📬 Контакты
 
 Telegram канал:  
-https://t.me/AlwexScript
+https://t.me/AlwexMessenger
 
 ---
 
