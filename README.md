@@ -131,9 +131,8 @@ Supabase Storage (файлы)
 ## 👨‍💻 Команда
 
 - Alwex — основатель, backend + frontend + архитектура  
-- Amir — тестирование  
-- ViQXXL — backend / бот-библиотека  
-
+- donut — тестирование  
+- ViQXXL — backend
 ---
 
 ## 💡 О проекте
