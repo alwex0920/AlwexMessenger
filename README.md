@@ -130,9 +130,9 @@ Supabase Storage (файлы)
 
 ## 👨‍💻 Команда
 
-- Алдар (Alwex) — основатель, backend + frontend + архитектура  
-- Амир — тестирование  
-- Дима — backend / бот-библиотека  
+- Alwex — основатель, backend + frontend + архитектура  
+- Amir — тестирование  
+- ViQXXL — backend / бот-библиотека  
 
 ---
 
