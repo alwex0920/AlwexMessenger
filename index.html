@@ -4141,7 +4141,7 @@
         }
     
         let messageText = m.content;
-        let signatureWarning = null;
+        let signatureWarning = null; // ← ВАЖНО: сбрасываем для каждого сообщения
         console.log('Message data:', { id: m.id, encryptedContent: m.encryptedContent, encryptedKey: m.encryptedKey, nonce: m.nonce, content: m.content });
     
         // --- ОТДЕЛЬНАЯ ВЕТКА ДЛЯ КАНАЛА ---
@@ -4194,7 +4194,7 @@
                 }
     
                 // Проверка подписи (только для чужих сообщений, где она есть)
-                if (parseInt(m.senderId) !== user.id) {
+                if (!isOwn) { // ← используем уже проверенный isOwn
                     if (m.signature) {
                         const senderPublicKey = users[m.senderId]?.publicKey;
                         if (senderPublicKey && m.encryptedContent) {
@@ -4252,7 +4252,7 @@
         } else {
             content += `<div class="msg-text">${escapeHtml(messageText)}</div>`;
         }
-
+    
         // Вставка предупреждения о подписи (если есть)
         if (signatureWarning) {
             content += `<div class="signature-warning">${signatureWarning}</div>`;
