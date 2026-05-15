@@ -53,6 +53,7 @@ Supabase Storage (файлы)
    - encryptedContent
    - encryptedKey
    - nonce
+   - signature
 
 Сервер не может прочитать сообщения.
 
