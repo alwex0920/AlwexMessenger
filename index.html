@@ -1697,6 +1697,39 @@
                 bytes[i] = binary.charCodeAt(i);
             }
             return bytes.buffer;
+        },
+        // Создание цифровой подписи (RSA-PSS)
+        static async signMessage(privateKey, encryptedContent) {
+            const privateKeyObj = await crypto.subtle.importKey(
+                'pkcs8',
+                this.base64ToArrayBuffer(privateKey),
+                { name: 'RSA-PSS', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+            const signature = await crypto.subtle.sign(
+                { name: 'RSA-PSS', saltLength: 32 },
+                privateKeyObj,
+                new TextEncoder().encode(encryptedContent)
+            );
+            return this.arrayBufferToBase64(signature);
+        }
+        
+        // Проверка цифровой подписи (RSA-PSS)
+        static async verifySignature(publicKey, encryptedContent, signature) {
+            const publicKeyObj = await crypto.subtle.importKey(
+                'spki',
+                this.base64ToArrayBuffer(publicKey),
+                { name: 'RSA-PSS', hash: 'SHA-256' },
+                false,
+                ['verify']
+            );
+            return crypto.subtle.verify(
+                { name: 'RSA-PSS', saltLength: 32 },
+                publicKeyObj,
+                this.base64ToArrayBuffer(signature),
+                new TextEncoder().encode(encryptedContent)
+            );
         }
     };
 
@@ -4116,6 +4149,20 @@
                 if (groupKey) {
                     try {
                         messageText = await CryptoHelper.decryptMessageWithKey(m.encryptedContent, m.nonce, groupKey);
+                        // После получения messageText
+                        if (m.signature && m.senderId !== user.id) {
+                            const senderPublicKey = users[m.senderId]?.publicKey;
+                            if (senderPublicKey && m.encryptedContent) {
+                                try {
+                                    const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
+                                    if (!isValid) {
+                                        messageText = '⚠️ [Подпись недействительна! Сообщение могло быть подделано.]';
+                                    }
+                                } catch (e) {
+                                    console.warn('Ошибка проверки подписи:', e);
+                                }
+                            }
+                        }
                     } catch (e) {
                         console.error('Group message decryption error', e);
                         messageText = '🔒 [Ошибка расшифровки]';
@@ -4136,6 +4183,20 @@
                         encryptedKey: keyToUse,
                         nonce: m.nonce
                     }, privateKey);
+                    // После получения messageText
+                    if (m.signature && m.senderId !== user.id) {
+                        const senderPublicKey = users[m.senderId]?.publicKey;
+                        if (senderPublicKey && m.encryptedContent) {
+                            try {
+                                const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
+                                if (!isValid) {
+                                    messageText = '⚠️ [Подпись недействительна! Сообщение могло быть подделано.]';
+                                }
+                            } catch (e) {
+                                console.warn('Ошибка проверки подписи:', e);
+                            }
+                        }
+                    }
                 } catch (e) {
                     console.error('Decryption error for message', m.id, e);
                     messageText = '🔒 [Ошибка расшифровки]';
@@ -4395,7 +4456,11 @@
                 body.content = content;
             }
         }
-    
+
+        if (body.encryptedContent) {
+            body.signature = await CryptoHelper.signMessage(privateKey, body.encryptedContent);
+        }
+        
         input.value = '';
         input.style.height = 'auto';
     
@@ -4422,7 +4487,8 @@
                 encryptedKeyForSender: body.encryptedKeyForSender,
                 nonce: body.nonce,
                 mediaData: mediaData,
-                replyTo: body.replyTo || null
+                replyTo: body.replyTo || null,
+                signature: body.signature,   // <-- добавь это поле
             }));
     
             clearImagePreview();
