@@ -4154,41 +4154,37 @@
                     }
                 } else {
                     // Личное сообщение
-                    try {
-                        let keyToUse = m.encryptedKey;
-                        if (isOwn && m.encryptedKeyForSender) {
-                            keyToUse = m.encryptedKeyForSender;
-                        }
-                        // Проверка наличия ключа перед расшифровкой
-                        if (!keyToUse || keyToUse === 'null' || keyToUse === '') {
-                            console.error('Missing encryptedKey for message', m.id, m);
-                            messageText = '🔒 [Ошибка: ключ не найден]';
-                        } else {
-                            console.log('Decrypting with key length:', keyToUse?.length, 'nonce:', m.nonce?.length, 'content:', m.encryptedContent?.length);
-                            messageText = await CryptoHelper.decryptMessage({
-                                encryptedContent: m.encryptedContent,
-                                encryptedKey: keyToUse,
-                                nonce: m.nonce
-                            }, privateKey);
-                        }
-                        // Проверка подписи (только для чужих сообщений, где она есть)
-                        if (m.signature && m.senderId !== user.id) {
-                            const senderPublicKey = users[m.senderId]?.publicKey;
-                            if (senderPublicKey && m.encryptedContent) {
-                                try {
-                                    const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
-                                    if (!isValid) {
-                                        messageText = '⚠️ [Подпись недействительна! Сообщение могло быть подделано.]';
-                                    }
-                                } catch (e) {
-                                    console.warn('Ошибка проверки подписи:', e);
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Decryption error for message', m.id, e);
-                        messageText = '🔒 [Ошибка расшифровки]';
+                    let keyToUse = m.encryptedKey;
+                    if (isOwn && m.encryptedKeyForSender) {
+                        keyToUse = m.encryptedKeyForSender;
                     }
+                    if (!keyToUse || keyToUse === 'null' || keyToUse === '') {
+                        console.error('Missing encryptedKey for message', m.id, m);
+                        messageText = '🔒 [Ошибка: ключ не найден]';
+                    } else {
+                        console.log('Decrypting with key length:', keyToUse?.length, 'nonce:', m.nonce?.length, 'content:', m.encryptedContent?.length);
+                        messageText = await CryptoHelper.decryptMessage({
+                            encryptedContent: m.encryptedContent,
+                            encryptedKey: keyToUse,
+                            nonce: m.nonce
+                        }, privateKey);
+                    }
+                }
+    
+                // Проверка подписи (только для чужих сообщений, где она есть)
+                if (m.signature && m.senderId !== user.id) {
+                    const senderPublicKey = users[m.senderId]?.publicKey;
+                    if (senderPublicKey && m.encryptedContent) {
+                        try {
+                            const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
+                            if (!isValid) {
+                                messageText = '⚠️ [Подпись недействительна! Сообщение могло быть подделано.]';
+                            }
+                        } catch (e) {
+                            console.warn('Ошибка проверки подписи:', e);
+                        }
+                    }
+                }
             } catch (e) {
                 console.error('Decryption error for message', m.id, e);
                 messageText = '🔒 [Ошибка расшифровки]';
@@ -4265,6 +4261,7 @@
         msgDiv.innerHTML = `<div class="msg-bubble">${content}</div>`;
         container.appendChild(msgDiv);
     }
+        
     async function pinDirectMessage(messageId) {
         const min = Math.min(user.id, currentChat.id);
         const max = Math.max(user.id, currentChat.id);
