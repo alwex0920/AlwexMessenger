@@ -4115,7 +4115,7 @@
         if (showSender && !isOwn) {
             content += `<div class="msg-sender">${escapeHtml(m.senderName || 'User')}</div>`;
         }
-
+    
         if (m.replyTo) {
             const original = messagesById[m.replyTo];
             if (original) {
@@ -4137,42 +4137,23 @@
         // --- ОТДЕЛЬНАЯ ВЕТКА ДЛЯ КАНАЛА ---
         if (currentChatType === 'channel') {
             // В канале сообщения не шифруются
-            console.log('Channel message:', m); // ЛОГ
+            console.log('Channel message:', m);
             messageText = m.content || '';
         } else if (m.encryptedContent && m.nonce && 
                    m.encryptedContent !== '' && m.nonce !== '' && 
                    m.encryptedContent !== 'null' && m.nonce !== 'null' && 
                    privateKey) {
             // Групповое или личное сообщение
-            if (currentChatType === 'group') {
-                const groupKey = groups[currentChat.id]?.key;
-                if (groupKey) {
-                    try {
+            try {
+                if (currentChatType === 'group') {
+                    const groupKey = groups[currentChat.id]?.key;
+                    if (groupKey) {
                         messageText = await CryptoHelper.decryptMessageWithKey(m.encryptedContent, m.nonce, groupKey);
-                        // После получения messageText
-                        if (m.signature && m.senderId !== user.id) {
-                            const senderPublicKey = users[m.senderId]?.publicKey;
-                            if (senderPublicKey && m.encryptedContent) {
-                                try {
-                                    const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
-                                    if (!isValid) {
-                                        messageText = '⚠️ [Подпись недействительна! Сообщение могло быть подделано.]';
-                                    }
-                                } catch (e) {
-                                    console.warn('Ошибка проверки подписи:', e);
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Group message decryption error', e);
-                        messageText = '🔒 [Ошибка расшифровки]';
+                    } else {
+                        messageText = '🔒 [Ключ группы недоступен]';
                     }
                 } else {
-                    messageText = '🔒 [Ключ группы недоступен]';
-                }
-            } else {
-                // Личное сообщение
-                try {
+                    // Личное сообщение
                     let keyToUse = m.encryptedKey;
                     // Если это своё сообщение и есть специальный ключ для себя, используем его
                     if (isOwn && m.encryptedKeyForSender) {
@@ -4183,24 +4164,25 @@
                         encryptedKey: keyToUse,
                         nonce: m.nonce
                     }, privateKey);
-                    // После получения messageText
-                    if (m.signature && m.senderId !== user.id) {
-                        const senderPublicKey = users[m.senderId]?.publicKey;
-                        if (senderPublicKey && m.encryptedContent) {
-                            try {
-                                const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
-                                if (!isValid) {
-                                    messageText = '⚠️ [Подпись недействительна! Сообщение могло быть подделано.]';
-                                }
-                            } catch (e) {
-                                console.warn('Ошибка проверки подписи:', e);
+                }
+    
+                // Проверка подписи (только для чужих сообщений, где она есть)
+                if (m.signature && m.senderId !== user.id) {
+                    const senderPublicKey = users[m.senderId]?.publicKey;
+                    if (senderPublicKey && m.encryptedContent) {
+                        try {
+                            const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
+                            if (!isValid) {
+                                messageText = '⚠️ [Подпись недействительна! Сообщение могло быть подделано.]';
                             }
+                        } catch (e) {
+                            console.warn('Ошибка проверки подписи:', e);
                         }
                     }
-                } catch (e) {
-                    console.error('Decryption error for message', m.id, e);
-                    messageText = '🔒 [Ошибка расшифровки]';
                 }
+            } catch (e) {
+                console.error('Decryption error for message', m.id, e);
+                messageText = '🔒 [Ошибка расшифровки]';
             }
         } else if (m.content && m.content !== '') {
             console.log('Plain text message', m.id, m.content);
@@ -4209,12 +4191,12 @@
             console.log('Empty message', m.id);
             messageText = '';
         }
-
+    
         if (currentChatType === 'channel' && !m.replyTo) {
             const commentCount = m.commentCount || 0;
             content += `<button class="comment-btn" onclick="openComments(${m.id}, ${commentCount})">💬 ${commentCount}</button>`;
         }
-
+    
         const fileUrl = `/api/files/${escapeHtml(m.mediaData)}?token=${encodeURIComponent(token)}`;        
         if (m.type === 'image' && m.mediaData) {
             // Старый формат: base64 начинается с 'data:image/'
@@ -4245,18 +4227,18 @@
             console.log('Own message', m.id, 'encryptedKeyForSender?', m.encryptedKeyForSender);
             content += `<button class="delete-msg-btn" onclick="deleteMessage(${m.id})">🗑️</button>`;
         }
-
+    
         if (isOwn || (currentChat?.role === 'admin' || currentChat?.ownerId === user.id)) {
             if ((currentChatType === 'group' || currentChatType === 'channel') && !m.isPinned) {
                 content += `<button class="pin-msg-btn" onclick="pinMessage(${m.id})">📌</button>`;
             }
         }
-
+    
         if (currentChatType === 'direct') {
             // Кнопка закрепления для личных чатов
             content += `<button class="pin-msg-btn" onclick="pinDirectMessage(${m.id})">📌</button>`;
         }
-
+    
         if (currentChatType === 'direct' || currentChatType === 'group') {
             // Кнопка ответа
             content += `<button class="reply-btn" onclick="replyToMessage(${m.id}, '${escapeHtml(m.content || '')}', ${m.senderId})">↩️</button>`;
@@ -4274,7 +4256,6 @@
         msgDiv.innerHTML = `<div class="msg-bubble">${content}</div>`;
         container.appendChild(msgDiv);
     }
-
     async function pinDirectMessage(messageId) {
         const min = Math.min(user.id, currentChat.id);
         const max = Math.max(user.id, currentChat.id);
