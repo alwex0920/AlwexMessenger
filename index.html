@@ -1713,7 +1713,7 @@
                 new TextEncoder().encode(encryptedContent)
             );
             return this.arrayBufferToBase64(signature);
-        }
+        },
         
         // Проверка цифровой подписи (RSA-PSS)
         async verifySignature(publicKey, encryptedContent, signature) {
