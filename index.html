@@ -547,6 +547,15 @@
             display: flex;
             opacity: 1;
         }
+        .signature-warning {
+            font-size: 11px;
+            color: #f59e0b;
+            margin-top: 4px;
+            padding: 2px 6px;
+            background: rgba(245, 158, 11, 0.1);
+            border-radius: 4px;
+            display: inline-block;
+        }
         .reply-btn:hover {
             transform: scale(1.1);
         }
@@ -4182,6 +4191,8 @@
                         }, privateKey);
                     }
                 }
+
+                let signatureWarning = null;
     
                 // Проверка подписи (только для чужих сообщений, где она есть)
                 if (m.signature && m.senderId !== user.id) {
@@ -4190,12 +4201,14 @@
                         try {
                             const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
                             if (!isValid) {
-                                messageText = '⚠️ [Подпись недействительна! Сообщение могло быть подделано.]';
+                                signatureWarning = '⚠️ Подпись недействительна! Сообщение могло быть подделано.';
                             }
                         } catch (e) {
                             console.warn('Ошибка проверки подписи:', e);
                         }
                     }
+                } else {
+                    signatureWarning = '⚠️ Сообщение не подписано';
                 }
             } catch (e) {
                 console.error('Decryption error for message', m.id, e);
@@ -4238,6 +4251,12 @@
         } else {
             content += `<div class="msg-text">${escapeHtml(messageText)}</div>`;
         }
+
+        // Вставка предупреждения о подписи (если есть)
+        if (signatureWarning) {
+            content += `<div class="signature-warning">${signatureWarning}</div>`;
+        }
+        
         content += `<div class="msg-time">${fmtTime(m.createdAt)}</div>`;
     
         if (isOwn) {
