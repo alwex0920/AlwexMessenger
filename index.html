@@ -1776,7 +1776,6 @@
     let currentCall = null; // объект комнаты RealtimeKit
     let currentMeeting = null;
     let currentPeerConnection = null;
-    let signatureWarning = null;
 
     document.addEventListener('click', async (e) => {
         const link = e.target.closest('.file-link');
@@ -4142,6 +4141,7 @@
         }
     
         let messageText = m.content;
+        let signatureWarning = null;
         console.log('Message data:', { id: m.id, encryptedContent: m.encryptedContent, encryptedKey: m.encryptedKey, nonce: m.nonce, content: m.content });
     
         // --- ОТДЕЛЬНАЯ ВЕТКА ДЛЯ КАНАЛА ---
