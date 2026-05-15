@@ -1776,6 +1776,7 @@
     let currentCall = null; // объект комнаты RealtimeKit
     let currentMeeting = null;
     let currentPeerConnection = null;
+    let signatureWarning = null;
 
     document.addEventListener('click', async (e) => {
         const link = e.target.closest('.file-link');
@@ -4191,8 +4192,6 @@
                         }, privateKey);
                     }
                 }
-
-                let signatureWarning = null;
     
                 // Проверка подписи (только для чужих сообщений, где она есть)
                 if (m.signature && m.senderId !== user.id) {
