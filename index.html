@@ -4141,7 +4141,7 @@
         }
     
         let messageText = m.content;
-        let signatureWarning = null; // ← ВАЖНО: сбрасываем для каждого сообщения
+        let signatureWarning = null; // ← сбрасываем для каждого сообщения
         console.log('Message data:', { id: m.id, encryptedContent: m.encryptedContent, encryptedKey: m.encryptedKey, nonce: m.nonce, content: m.content });
     
         // --- ОТДЕЛЬНАЯ ВЕТКА ДЛЯ КАНАЛА ---
@@ -4173,45 +4173,11 @@
                         messageText = '🔒 [Ошибка: ключ не найден]';
                     } else {
                         console.log('Decrypting with key length:', keyToUse?.length, 'nonce:', m.nonce?.length, 'content:', m.encryptedContent?.length);
-                        console.log('🔑 Debug decrypt:', {
-                            isOwn,
-                            senderId: m.senderId,
-                            myUserId: user.id,
-                            keyToUseLength: keyToUse?.length,
-                            encryptedKeyForSenderLength: m.encryptedKeyForSender?.length,
-                            privateKeyLength: privateKey?.length,
-                            encryptedContentLength: m.encryptedContent?.length,
-                            nonceLength: m.nonce?.length,
-                            keyToUsePreview: keyToUse?.substring(0, 20) + '...',
-                            privateKeyPreview: privateKey?.substring(0, 20) + '...'
-                        });
                         messageText = await CryptoHelper.decryptMessage({
                             encryptedContent: m.encryptedContent,
                             encryptedKey: keyToUse,
                             nonce: m.nonce
                         }, privateKey);
-                    }
-                }
-    
-                // Проверка подписи (только для чужих сообщений, где она есть)
-                if (!isOwn) {
-                    if (m.signature) {
-                        // Подпись есть – проверяем
-                        const senderPublicKey = users[m.senderId]?.publicKey;
-                        if (senderPublicKey && m.encryptedContent) {
-                            try {
-                                const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
-                                if (!isValid) {
-                                    signatureWarning = '⚠️ Подпись недействительна! Сообщение могло быть подделано.';
-                                }
-                            } catch (e) {
-                                console.warn('Ошибка проверки подписи:', e);
-                                signatureWarning = '⚠️ Ошибка проверки подписи';
-                            }
-                        }
-                    } else {
-                        // Подписи нет – предупреждаем
-                        signatureWarning = '⚠️ Сообщение не подписано';
                     }
                 }
             } catch (e) {
@@ -4224,6 +4190,28 @@
         } else {
             console.log('Empty message', m.id);
             messageText = '';
+        }
+    
+        // ===== ПРОВЕРКА ПОДПИСИ ДЛЯ ВСЕХ ЧУЖИХ СООБЩЕНИЙ =====
+        if (!isOwn) {
+            if (m.signature) {
+                // Подпись есть – проверяем
+                const senderPublicKey = users[m.senderId]?.publicKey;
+                if (senderPublicKey && m.encryptedContent) {
+                    try {
+                        const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
+                        if (!isValid) {
+                            signatureWarning = '⚠️ Подпись недействительна! Сообщение могло быть подделано.';
+                        }
+                    } catch (e) {
+                        console.warn('Ошибка проверки подписи:', e);
+                        signatureWarning = '⚠️ Ошибка проверки подписи';
+                    }
+                }
+            } else {
+                // Подписи нет – предупреждаем
+                signatureWarning = '⚠️ Сообщение не подписано';
+            }
         }
     
         if (currentChatType === 'channel' && !m.replyTo) {
