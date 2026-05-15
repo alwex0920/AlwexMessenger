@@ -1699,7 +1699,7 @@
             return bytes.buffer;
         },
         // Создание цифровой подписи (RSA-PSS)
-        static async signMessage(privateKey, encryptedContent) {
+        async signMessage(privateKey, encryptedContent) {
             const privateKeyObj = await crypto.subtle.importKey(
                 'pkcs8',
                 this.base64ToArrayBuffer(privateKey),
@@ -1716,7 +1716,7 @@
         }
         
         // Проверка цифровой подписи (RSA-PSS)
-        static async verifySignature(publicKey, encryptedContent, signature) {
+        async verifySignature(publicKey, encryptedContent, signature) {
             const publicKeyObj = await crypto.subtle.importKey(
                 'spki',
                 this.base64ToArrayBuffer(publicKey),
