@@ -4106,7 +4106,7 @@
         }
     
         const container = document.getElementById('messages');
-        const isOwn = m.senderId === user.id;
+        const isOwn = parseInt(m.senderId) === user.id;
         const msgDiv = document.createElement('div');
         msgDiv.className = 'message' + (isOwn ? ' own' : '');
         msgDiv.dataset.messageId = m.id;
