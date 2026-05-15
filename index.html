@@ -4194,8 +4194,9 @@
                 }
     
                 // Проверка подписи (только для чужих сообщений, где она есть)
-                if (!isOwn) { // ← используем уже проверенный isOwn
+                if (!isOwn) {
                     if (m.signature) {
+                        // Подпись есть – проверяем
                         const senderPublicKey = users[m.senderId]?.publicKey;
                         if (senderPublicKey && m.encryptedContent) {
                             try {
@@ -4205,9 +4206,11 @@
                                 }
                             } catch (e) {
                                 console.warn('Ошибка проверки подписи:', e);
+                                signatureWarning = '⚠️ Ошибка проверки подписи';
                             }
                         }
                     } else {
+                        // Подписи нет – предупреждаем
                         signatureWarning = '⚠️ Сообщение не подписано';
                     }
                 }
