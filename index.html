@@ -4163,6 +4163,18 @@
                         messageText = '🔒 [Ошибка: ключ не найден]';
                     } else {
                         console.log('Decrypting with key length:', keyToUse?.length, 'nonce:', m.nonce?.length, 'content:', m.encryptedContent?.length);
+                        console.log('🔑 Debug decrypt:', {
+                            isOwn,
+                            senderId: m.senderId,
+                            myUserId: user.id,
+                            keyToUseLength: keyToUse?.length,
+                            encryptedKeyForSenderLength: m.encryptedKeyForSender?.length,
+                            privateKeyLength: privateKey?.length,
+                            encryptedContentLength: m.encryptedContent?.length,
+                            nonceLength: m.nonce?.length,
+                            keyToUsePreview: keyToUse?.substring(0, 20) + '...',
+                            privateKeyPreview: privateKey?.substring(0, 20) + '...'
+                        });
                         messageText = await CryptoHelper.decryptMessage({
                             encryptedContent: m.encryptedContent,
                             encryptedKey: keyToUse,
