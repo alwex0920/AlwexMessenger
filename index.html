@@ -4194,20 +4194,22 @@
                 }
     
                 // Проверка подписи (только для чужих сообщений, где она есть)
-                if (m.signature && m.senderId !== user.id) {
-                    const senderPublicKey = users[m.senderId]?.publicKey;
-                    if (senderPublicKey && m.encryptedContent) {
-                        try {
-                            const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
-                            if (!isValid) {
-                                signatureWarning = '⚠️ Подпись недействительна! Сообщение могло быть подделано.';
+                if (parseInt(m.senderId) !== user.id) {
+                    if (m.signature) {
+                        const senderPublicKey = users[m.senderId]?.publicKey;
+                        if (senderPublicKey && m.encryptedContent) {
+                            try {
+                                const isValid = await CryptoHelper.verifySignature(senderPublicKey, m.encryptedContent, m.signature);
+                                if (!isValid) {
+                                    signatureWarning = '⚠️ Подпись недействительна! Сообщение могло быть подделано.';
+                                }
+                            } catch (e) {
+                                console.warn('Ошибка проверки подписи:', e);
                             }
-                        } catch (e) {
-                            console.warn('Ошибка проверки подписи:', e);
                         }
+                    } else {
+                        signatureWarning = '⚠️ Сообщение не подписано';
                     }
-                } else {
-                    signatureWarning = '⚠️ Сообщение не подписано';
                 }
             } catch (e) {
                 console.error('Decryption error for message', m.id, e);
