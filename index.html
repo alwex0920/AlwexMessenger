@@ -1393,6 +1393,8 @@
             </div>
         </div>
     </div>
+    <div id="callTimerOverlay" style="display:none; position:fixed; top:10px; left:50%; transform:translateX(-50%); background:var(--bg2); color:var(--warning); padding:8px 16px; border-radius:8px; z-index:99999; font-weight:bold; font-size:16px; box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+    </div>
     <script>
     // ============================================
     // КРИПТОГРАФИЯ E2E - НОВЫЙ КОД
@@ -1776,6 +1778,10 @@
     let currentCall = null; // объект комнаты RealtimeKit
     let currentMeeting = null;
     let currentPeerConnection = null;
+    const CALL_DURATION_MINUTES = 60; // лимит в минутах (можно поменять)
+    let callTimerInterval = null;
+    let callTimerSeconds = 0;
+    let callTimerElement = null; // DOM-элемент для отображения времени
 
     document.addEventListener('click', async (e) => {
         const link = e.target.closest('.file-link');
@@ -1824,7 +1830,7 @@
       url.searchParams.set('chat', chatId);
       window.location.href = url.toString();
     };
-
+        
     async function startCall() {
         if (!currentChat || currentChatType !== 'direct') {
             toast('Звонки', 'Пока только в личных чатах', 'info');
@@ -1854,6 +1860,36 @@
             toast('Ошибка', 'Не удалось начать звонок', 'error');
         }
     }
+
+    function startCallTimer() {
+        callTimerSeconds = CALL_DURATION_MINUTES * 60;
+        const timerDisplay = document.getElementById('callTimerOverlay');
+        if (timerDisplay) {
+            timerDisplay.textContent = formatCallTimer(callTimerSeconds);
+            timerDisplay.style.display = 'block';
+        }
+        callTimerInterval = setInterval(() => {
+            callTimerSeconds--;
+            if (timerDisplay) {
+                timerDisplay.textContent = formatCallTimer(callTimerSeconds);
+            }
+            if (callTimerSeconds === 60) {
+                toast('Звонок', 'Осталась 1 минута', 'info');
+            }
+            if (callTimerSeconds <= 0) {
+                clearInterval(callTimerInterval);
+                callTimerInterval = null;
+                toast('Звонок завершён', 'Истекло время', 'warning');
+                endCall();
+            }
+        }, 1000);
+    }
+    
+    function formatCallTimer(seconds) {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
     
     async function joinCall(authToken) {
         try {
@@ -1866,6 +1902,7 @@
             meetingElement.meeting = meeting;
             document.body.appendChild(meetingElement);
             console.log('Meeting element in DOM:', document.querySelector('rtk-meeting'));
+            startCallTimer();
     
             // Сохраняем для последующего закрытия
             window.currentMeeting = meeting;
@@ -1902,6 +1939,13 @@
     }
 
     async function endCall() {
+        if (callTimerInterval) {
+            clearInterval(callTimerInterval);
+            callTimerInterval = null;
+        }
+        const timerOverlay = document.getElementById('callTimerOverlay');
+        if (timerOverlay) timerOverlay.style.display = 'none';
+        
         if (currentMeeting) {
             currentMeeting.leave();
             currentMeeting = null;
